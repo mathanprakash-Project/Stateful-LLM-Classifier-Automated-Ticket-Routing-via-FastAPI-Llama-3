@@ -25,7 +25,7 @@ from schema import TicketClassification
 load_dotenv()
 
 # Change default fallback to your local model
-_DEFAULT_MODEL = os.getenv("DEFAULT_MODEL", "llama3.1")
+_DEFAULT_MODEL = os.getenv("DEFAULT_MODEL", "llama3.2.3b")
 
 DEFAULT_SYSTEM_PROMPT = "You are an expert customer support ticket classifier."
 
