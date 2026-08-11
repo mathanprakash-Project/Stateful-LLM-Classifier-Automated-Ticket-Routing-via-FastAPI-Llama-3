@@ -20,7 +20,7 @@ from schema import TicketClassification
 load_dotenv()
 
 
-def build_deterministic_llm(model: str = "llama3.1") -> ChatOllama:
+def build_deterministic_llm(model: str = "llama3.2.3b") -> ChatOllama:
     """
     temperature=0  → greedy decoding, most probable token always chosen.
     This gives near-identical outputs for the same input.
@@ -31,7 +31,7 @@ def build_deterministic_llm(model: str = "llama3.1") -> ChatOllama:
     )
 
 
-def build_creative_llm(model: str = "llama3.1", temperature: float = 0.7) -> ChatOllama:
+def build_creative_llm(model: str = "llama3.2.3b", temperature: float = 0.7) -> ChatOllama:
     """
     Higher temperature for tasks where variation is desirable, e.g.
     generating empathetic reply drafts or brainstorming resolutions.

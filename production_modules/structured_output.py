@@ -39,7 +39,7 @@ SIMPLE_SYSTEM_PROMPT = (
 
 # ---------------------------------------------------------------------------
 # Approach 1: Function-calling (recommended)
-# Use when: the model supports tool/function calling (llama3.1 supports this well)
+# Use when: the model supports tool/function calling (llama3.2 supports this well)
 # Pros: Model is explicitly told the schema; more reliable JSON adherence.
 # Cons: Slightly higher token overhead for the schema definition.
 # ---------------------------------------------------------------------------
