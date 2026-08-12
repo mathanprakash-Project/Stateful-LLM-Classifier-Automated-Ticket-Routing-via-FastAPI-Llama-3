@@ -17,7 +17,7 @@ load_dotenv()
 PROMPT_REGISTRY: dict[str, dict] = {
     "v1": {
         "version_id": "v1",
-        "model": "llama3.2.3b", # Updated for local setup
+        "model": "llama3.2:3b", # Updated for local setup
         "created_at": "2024-01-01",
         "description": "Basic classification prompt",
         # System instructions only — ticket text and JSON format are injected by
@@ -26,7 +26,7 @@ PROMPT_REGISTRY: dict[str, dict] = {
     },
     "v2": {
         "version_id": "v2",
-        "model": "llama3.2.3b", # Updated for local setup
+        "model": "llama3.2:3b", # Updated for local setup
         "created_at": "2024-03-01",
         "description": "Adds chain-of-thought reasoning instruction",
         # System instructions only — ticket text and JSON format are injected by

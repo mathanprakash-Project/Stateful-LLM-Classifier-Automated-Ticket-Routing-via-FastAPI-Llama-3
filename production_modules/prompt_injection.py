@@ -29,7 +29,7 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 # Default model updated for local Ollama setup
-GUARD_MODEL = os.getenv("DEFAULT_MODEL", "llama3.2.3b")
+GUARD_MODEL = os.getenv("DEFAULT_MODEL", "llama3.2:3b")
 
 # ---------------------------------------------------------------------------
 # Structured output schema for the guard LLM

@@ -35,7 +35,7 @@ _EMAIL_RE = re.compile(
 # (?<!\d) lookbehind prevents matching mid-sequence inside longer digit strings
 # (e.g. the last 10 digits of a credit card number)
 _PHONE_RE = re.compile(
-    r"(?<!\d)(?:\+?1[\s.\-]?)?(?:\(?\d{3}\)?[\s.\-]?)?\d{3}[\s.\-]?\d{4}(?!\d)",
+    r"(?:\+?\d{1,3}[\s.\-]?)?(?:\(?\d{3}\)?[\s.\-]?)?\d{3}[\s.\-]?\d{4}(?!\d)",
 )
 
 # Credit card: 13–19 digit numbers optionally separated by spaces or hyphens.
@@ -54,7 +54,7 @@ def _find_credit_cards(text: str) -> list[re.Match]:
 
 # ---------------------------------------------------------------------------
 # Public interface
-# ---------------------------------------------------------------------------
+# --------------(?<!\d)-------------------------------------------------------------
 
 @dataclass
 class RedactionResult:
