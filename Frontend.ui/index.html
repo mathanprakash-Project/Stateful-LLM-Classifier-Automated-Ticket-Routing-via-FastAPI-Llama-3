@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Support Ticket Classifier | Local AI</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+    :root {
+      --bg-gradient: linear-gradient(135deg, #f0f4f8 0%, #e2e8f0 100%);
+      --surface: #ffffff;
+      --surface-hover: #f8fafc;
+      --border: #e2e8f0;
+      --text-primary: #0f172a;
+      --text-secondary: #64748b;
+      --text-tertiary: #94a3b8;
+      --accent-primary: #6366f1;
+      --accent-hover: #4f46e5;
+      --radius-lg: 16px;
+      --radius-md: 12px;
+      --radius-sm: 8px;
+      --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+      --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg-gradient);
+      color: var(--text-primary);
+      font-family: 'Inter', system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 1.25rem 2.5rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      box-shadow: var(--shadow-sm);
+      z-index: 10;
+    }
+    
+    .logo-icon {
+      background: #eef2ff;
+      padding: 0.5rem;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    header h1 { font-size: 1.25rem; font-weight: 700; color: var(--text-primary); letter-spacing: -0.02em; }
+    header span { 
+      font-size: 0.75rem; 
+      font-weight: 600;
+      color: #4338ca; 
+      background: #e0e7ff;
+      padding: 0.25rem 0.75rem;
+      border-radius: 999px;
+      letter-spacing: 0.02em;
+    }
+
+    .main {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2rem;
+      padding: 2.5rem;
+      max-width: 1400px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    @media (max-width: 850px) {
+      .main { grid-template-columns: 1fr; padding: 1.5rem; }
+    }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+      box-shadow: var(--shadow-md);
+    }
+
+    .panel-title {
+      font-size: 0.9rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    /* Sample buttons */
+    .samples { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+    .sample-btn {
+      background: var(--surface-hover);
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      font-size: 0.8rem;
+      font-weight: 500;
+      padding: 0.5rem 1rem;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .sample-btn:hover { 
+      background: #f1f5f9; 
+      border-color: #cbd5e1; 
+      color: var(--text-primary);
+      transform: translateY(-1px);
+    }
+
+    textarea {
+      width: 100%;
+      flex: 1;
+      min-height: 200px;
+      background: var(--surface-hover);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      color: var(--text-primary);
+      font-size: 0.95rem;
+      font-family: inherit;
+      line-height: 1.6;
+      padding: 1rem 1.25rem;
+      resize: vertical;
+      outline: none;
+      transition: all 0.2s ease;
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
+    }
+    textarea:focus { 
+      border-color: var(--accent-primary); 
+      background: var(--surface);
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+    }
+    textarea::placeholder { color: var(--text-tertiary); }
+
+    .controls { display: flex; gap: 1rem; align-items: center; margin-top: 0.5rem; }
+
+    select {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      padding: 0.7rem 1rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.9rem;
+      font-weight: 500;
+      outline: none;
+      cursor: pointer;
+      transition: border-color 0.2s ease;
+    }
+    select:focus { border-color: var(--accent-primary); }
+
+    .classify-btn {
+      flex: 1;
+      background: var(--accent-primary);
+      border: none;
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 600;
+      padding: 0.75rem 1.5rem;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
+    }
+    .classify-btn:hover { 
+      background: var(--accent-hover); 
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(99, 102, 241, 0.3);
+    }
+    .classify-btn:active { transform: scale(0.98); }
+    .classify-btn:disabled { 
+      background: #cbd5e1; 
+      cursor: not-allowed; 
+      color: #f8fafc;
+      box-shadow: none;
+      transform: none;
+    }
+
+    /* Result cards */
+    .result-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    .card {
+      background: var(--surface-hover);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 1.25rem;
+      transition: transform 0.2s ease;
+    }
+    .card:hover { transform: translateY(-2px); }
+    
+    .card-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-secondary);
+      margin-bottom: 0.5rem;
+    }
+    .card-value {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .card-wide { grid-column: 1 / -1; }
+
+    .badge {
+      display: inline-block;
+      padding: 0.3rem 0.75rem;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .priority-low    { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+    .priority-medium { background: #fef9c3; color: #92400e; border: 1px solid #fde047; }
+    .priority-high   { background: #ede9fe; color: #5b21b6; border: 1px solid #ddd6fe; }
+    .priority-critical { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+
+    .sentiment-positive { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+    .sentiment-neutral  { background: #e0f2fe; color: #1e40af; border: 1px solid #bae6fd; }
+    .sentiment-negative { background: #ffedd5; color: #9a3412; border: 1px solid #fed7aa; }
+    .sentiment-angry    { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+
+    .confidence-bar-wrap {
+      background: #e2e8f0;
+      border-radius: 999px;
+      height: 10px;
+      overflow: hidden;
+      margin-top: 0.75rem;
+    }
+    .confidence-bar {
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #818cf8 0%, #4f46e5 100%);
+      transition: width 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    /* Status strip */
+    .status-strip {
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      padding: 1rem 2.5rem;
+      display: flex;
+      align-items: center;
+      gap: 2.5rem;
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      flex-wrap: wrap;
+    }
+    .status-item { display: flex; align-items: center; gap: 0.5rem; }
+    .status-item span.label { color: var(--text-tertiary); font-weight: 500; }
+    .status-item span.value { color: var(--text-primary); font-weight: 600; }
+    .pii-badge { color: #dc2626; font-weight: 700; background: #fee2e2; padding: 0.1rem 0.5rem; border-radius: 4px; }
+    .pii-clean { color: #16a34a; font-weight: 700; background: #dcfce7; padding: 0.1rem 0.5rem; border-radius: 4px; }
+
+    /* Spinner */
+    .spinner {
+      display: inline-block;
+      width: 18px; height: 18px;
+      border: 3px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-right: 0.5rem;
+      vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .error-msg {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: #dc2626;
+      border-radius: var(--radius-sm);
+      padding: 1rem;
+      font-size: 0.9rem;
+      font-weight: 500;
+    }
+
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+      color: var(--text-tertiary);
+      gap: 1rem;
+      text-align: center;
+      padding: 3rem;
+    }
+    .empty-state svg { color: #cbd5e1; }
+    .empty-state p { font-size: 0.95rem; font-weight: 500;}
+
+    .human-review-flag {
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      color: #b45309;
+      border-radius: var(--radius-sm);
+      padding: 0.75rem 1rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo-icon">
+    <svg width="24" height="24" fill="none" viewBox="0 0 24 24">
+      <path stroke="#4f46e5" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
+        d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/>
+    </svg>
+  </div>
+  <h1>Support Ticket Classifier</h1>
+  <span>LangGraph + Local Ollama</span>
+</header>
+
+<div class="main">
+
+  <!-- LEFT: Input Panel -->
+  <div class="panel">
+    <div class="panel-title">
+      <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+      Ticket Input
+    </div>
+
+    <div class="samples">
+      <button class="sample-btn" onclick="fillSample(0)">📦 Delayed Delivery</button>
+      <button class="sample-btn" onclick="fillSample(1)">💳 Double Charged</button>
+      <button class="sample-btn" onclick="fillSample(2)">🔐 Login Broken</button>
+    </div>
+
+    <textarea id="ticketText" placeholder="Paste or type a customer support ticket here…"></textarea>
+
+    <div class="controls">
+      <select id="channel">
+        <option value="web_form">Web Form</option>
+        <option value="email">Email</option>
+      </select>
+      <button class="classify-btn" id="classifyBtn" onclick="classify()">Classify Ticket</button>
+    </div>
+  </div>
+
+  <!-- RIGHT: Results Panel -->
+  <div class="panel" id="resultsPanel">
+    <div class="panel-title">
+      <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+      Classification Result
+    </div>
+    <div class="empty-state" id="emptyState">
+      <svg width="64" height="64" fill="none" viewBox="0 0 24 24">
+        <path stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+          d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+      </svg>
+      <p>Submit a ticket to see the local AI classification result</p>
+    </div>
+    <div class="result-grid" id="resultGrid" style="display:none;"></div>
+  </div>
+
+</div>
+
+<!-- BOTTOM: Status strip -->
+<div class="status-strip" id="statusStrip">
+  <div class="status-item">
+    <span class="label">Tokens:</span>
+    <span class="value" id="statusTokens">—</span>
+  </div>
+  <div class="status-item">
+    <span class="label">Cost:</span>
+    <span class="value" id="statusCost">—</span>
+  </div>
+  <div class="status-item">
+    <span class="label">PII Scrubbing:</span>
+    <span class="value" id="statusPii">—</span>
+  </div>
+  <div class="status-item">
+    <span class="label">Active Prompt:</span>
+    <span class="value" id="statusPrompt">—</span>
+  </div>
+</div>
+
+<script>
+const SAMPLES = [
+  {
+    channel: "web_form",
+    text: "I am absolutely furious! My package was supposed to arrive 5 days ago and it still hasn't shown up. I've been waiting at home all week. This is completely unacceptable. Order #98765. I want an immediate update or a full refund!\nEmail: customer@xyzmail.com \nCredit card number: 1234567890123456",
+  },
+  {
+    channel: "email",
+    text: "Subject: Double charge on my account\n\nHello,\n\nI noticed I was charged twice for the same order (#44321) placed on March 15th. Both charges of $89.99 appear on my bank statement. Please refund one of the charges immediately. This is very concerning.\n\nThank you,\nA frustrated customer",
+  },
+  {
+    channel: "web_form",
+    text: "I can't log into my account at all. I keep getting 'Invalid credentials' even though I just reset my password 3 times. I need to access my order history urgently. Please help — I've been locked out for 2 days.",
+  },
+];
+
+function fillSample(index) {
+  const s = SAMPLES[index];
+  document.getElementById("ticketText").value = s.text;
+  document.getElementById("channel").value = s.channel;
+}
+
+function priorityClass(p) {
+  return { low: "priority-low", medium: "priority-medium", high: "priority-high", critical: "priority-critical" }[p] || "";
+}
+function sentimentClass(s) {
+  return { positive: "sentiment-positive", neutral: "sentiment-neutral", negative: "sentiment-negative", angry: "sentiment-angry" }[s] || "";
+}
+function formatCategory(s) {
+  return s.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+}
+
+async function classify() {
+  const text = document.getElementById("ticketText").value.trim();
+  if (!text) { alert("Please enter a ticket."); return; }
+
+  const btn = document.getElementById("classifyBtn");
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Classifying…';
+
+  document.getElementById("emptyState").style.display = "flex";
+  document.getElementById("resultGrid").style.display = "none";
+
+  try {
+    const resp = await fetch("http://localhost:8000/classify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ticket_text: text, channel: document.getElementById("channel").value }),
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json();
+      throw new Error(err.detail || resp.statusText);
+    }
+
+    const data = await resp.json();
+    renderResult(data);
+  } catch (e) {
+    document.getElementById("emptyState").innerHTML =
+      `<div class="error-msg">Error: ${e.message}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Classify Ticket";
+  }
+}
+
+function renderResult(d) {
+  const grid = document.getElementById("resultGrid");
+  const confPct = Math.round(d.confidence_score * 100);
+
+  grid.innerHTML = `
+    <div class="card">
+      <div class="card-label">Category</div>
+      <div class="card-value">${formatCategory(d.issue_category)}</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Assigned Team</div>
+      <div class="card-value">${formatCategory(d.assigned_team)}</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Priority</div>
+      <div class="card-value">
+        <span class="badge ${priorityClass(d.priority)}">${d.priority.toUpperCase()}</span>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-label">Sentiment</div>
+      <div class="card-value">
+        <span class="badge ${sentimentClass(d.user_sentiment)}">${d.user_sentiment.toUpperCase()}</span>
+      </div>
+    </div>
+    <div class="card card-wide">
+      <div class="card-label">Confidence Score — ${confPct}%</div>
+      <div class="confidence-bar-wrap">
+        <div class="confidence-bar" style="width:${confPct}%"></div>
+      </div>
+    </div>
+    <div class="card card-wide">
+      <div class="card-label">Reasoning</div>
+      <div class="card-value" style="font-weight:400;font-size:0.95rem;line-height:1.5;color:var(--text-secondary)">${d.reasoning}</div>
+    </div>
+    ${d.requires_human_review ? '<div class="human-review-flag"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg> Flagged for human review</div>' : ""}
+    ${d.injection_blocked ? '<div class="human-review-flag" style="background:#fef2f2;color:#dc2626;border-color:#fecaca"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path></svg> Injection attempt blocked</div>' : ""}
+  `;
+
+  // Status strip
+  const cost = d.cost_info;
+  document.getElementById("statusTokens").textContent =
+    cost ? `${cost.input_tokens} in / ${cost.output_tokens} out` : "—";
+  document.getElementById("statusCost").textContent =
+    cost ? `$${cost.total_cost_usd.toFixed(6)}` : "—";
+  document.getElementById("statusPii").innerHTML =
+    d.pii_detected
+      ? '<span class="pii-badge">DETECTED</span>'
+      : '<span class="pii-clean">CLEAN</span>';
+  document.getElementById("statusPrompt").textContent = d.prompt_version || "—";
+
+  document.getElementById("emptyState").style.display = "none";
+  grid.style.display = "grid";
+}
+</script>
+</body>
+</html>
