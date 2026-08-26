@@ -1,7 +1,7 @@
 """
 LangGraph pipeline for ticket classification.
 
-Each node delegates to a production module — no LLM wiring lives here.
+Each node delegates to a module inside app.modules — no LLM wiring lives here.
 
 Node order: pii_redact → injection_check → classify → validate → cost_log
                                                  ↓ (fail)
@@ -14,19 +14,18 @@ import os
 from dotenv import load_dotenv
 from langgraph.graph import StateGraph, START, END
 
-from schema import TicketClassification
-from production_modules.pii_redaction import redact_pii
-from production_modules.prompt_injection import check_injection
-from production_modules.prompt_versioning import get_active_prompt, get_active_version
-from production_modules.structured_output import classify_with_json_mode
-from production_modules.validate_response import validate_classification
-from production_modules.cost_calculator import calculate_cost, count_tokens
-from production_modules.fallback_retry import classify_with_fallback, SAFE_CLASSIFICATION
+from app.schema import TicketClassification
+from app.modules.pii_redaction import redact_pii
+from app.modules.prompt_injection import check_injection
+from app.modules.prompt_versioning import get_active_prompt, get_active_version
+from app.modules.structured_output import classify_with_json_mode
+from app.modules.validate_response import validate_classification
+from app.modules.cost_calculator import calculate_cost, count_tokens
+from app.modules.fallback_retry import classify_with_fallback, SAFE_CLASSIFICATION
 
 load_dotenv()
 logger = logging.getLogger(__name__)
 
-# UPDATED: Changed the default model to your local Ollama instance
 DEFAULT_MODEL = os.getenv("DEFAULT_MODEL", "llama3.2:3b")
 
 
@@ -208,3 +207,4 @@ def run_pipeline(ticket_text: str, channel: str = "web_form") -> dict:
         "injection_blocked": False,
     }
     return graph.invoke(initial_state)
+

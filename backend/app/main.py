@@ -11,9 +11,9 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from graph import run_pipeline
-from production_modules.prompt_versioning import list_versions, get_active_version
-from production_modules.cost_calculator import session_tracker
+from app.graph import run_pipeline
+from app.modules.prompt_versioning import list_versions, get_active_version
+from app.modules.cost_calculator import session_tracker
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(name)s | %(message)s")
@@ -46,10 +46,9 @@ class ClassifyResponse(BaseModel):
 # Startup banner
 # ---------------------------------------------------------------------------
 def print_banner():
-    # UPDATED: Default fallback is now your local model
     model = os.getenv("DEFAULT_MODEL", "llama3.2:3b")
     prompt_version = get_active_version()
-    pii_enabled = True   # always on in this build
+    pii_enabled = True
     cost_tracking = os.getenv("LOG_COSTS", "true").lower() == "true"
 
     banner = f"""
@@ -133,4 +132,5 @@ async def classify(request: ClassifyRequest):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
+

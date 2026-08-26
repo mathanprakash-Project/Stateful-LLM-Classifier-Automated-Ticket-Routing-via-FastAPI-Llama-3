@@ -1,10 +1,5 @@
 """
 Versioned prompt registry for the ticket classifier.
-
-# PRODUCTION NOTE: In a real system, store prompts in a database (Postgres,
-# DynamoDB) with full version history, author metadata, A/B test assignments,
-# and rollback capability. Use a feature flag service to control active version
-# per environment/customer segment.
 """
 
 import os
@@ -17,20 +12,16 @@ load_dotenv()
 PROMPT_REGISTRY: dict[str, dict] = {
     "v1": {
         "version_id": "v1",
-        "model": "llama3.2:3b", # Updated for local setup
+        "model": "llama3.2:3b",
         "created_at": "2024-01-01",
         "description": "Basic classification prompt",
-        # System instructions only — ticket text and JSON format are injected by
-        # classify_with_json_mode, not here.
         "template": "You are a customer support ticket classifier.",
     },
     "v2": {
         "version_id": "v2",
-        "model": "llama3.2:3b", # Updated for local setup
+        "model": "llama3.2:3b",
         "created_at": "2024-03-01",
         "description": "Adds chain-of-thought reasoning instruction",
-        # System instructions only — ticket text and JSON format are injected by
-        # classify_with_json_mode, not here.
         "template": """You are an expert customer support ticket classifier.
 
 Think step by step before classifying:
@@ -74,9 +65,6 @@ def list_versions() -> list[dict]:
     ]
 
 
-# ---------------------------------------------------------------------------
-# Demo
-# ---------------------------------------------------------------------------
 if __name__ == "__main__":
     print("Available versions:")
     for v in list_versions():
@@ -84,3 +72,4 @@ if __name__ == "__main__":
     print(f"\nActive version: {get_active_version()}")
     prompt = get_active_prompt()
     print(f"\nActive prompt template:\n{prompt['template']}")
+

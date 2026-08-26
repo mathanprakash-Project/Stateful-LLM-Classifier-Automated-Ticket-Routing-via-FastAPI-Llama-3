@@ -57,3 +57,4 @@ class TicketState(BaseModel):
     pii_detected: bool = False
     prompt_version: Optional[str] = None
     injection_blocked: bool = False
+

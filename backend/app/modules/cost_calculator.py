@@ -8,13 +8,9 @@ Token count approximation and session-level cost tracking for local models.
 
 import tiktoken
 from dataclasses import dataclass
-# from typing import Optional
 
-# Prices in USD per 1,000 tokens (as of 2024)
-# Added local models with $0.00 costs
 PRICING: dict[str, dict[str, float]] = {
     "llama3.2:3b": {"input": 0.0, "output": 0.0},
-    # Kept OpenAI models for reference or hybrid workflows
     "gpt-4o-mini": {"input": 0.00015, "output": 0.00060},
     "gpt-4o": {"input": 0.005, "output": 0.015},
     "gpt-4-turbo": {"input": 0.010, "output": 0.030},
@@ -57,20 +53,17 @@ class SessionCostTracker:
         }
 
 
-# Module-level session tracker (reset per process)
 session_tracker = SessionCostTracker()
 
 
 def count_tokens(text: str, model: str = "llama3.2:3b") -> int:
     """
     Count approximate tokens in a string using tiktoken.
-    For non-OpenAI models like Ollama, this falls back to cl100k_base 
-    to provide a close approximation.
+    For non-OpenAI models like Ollama, this falls back to cl100k_base.
     """
     try:
         encoding = tiktoken.encoding_for_model(model)
     except KeyError:
-        # Fallback for local models like llama3.2:3b
         encoding = tiktoken.get_encoding("cl100k_base")
     return len(encoding.encode(text))
 
@@ -82,7 +75,6 @@ def calculate_cost(
     record_to_session: bool = True,
 ) -> CostInfo:
     """Calculate cost for an LLM call and optionally record to session tracker."""
-    # Default to llama3.2:3b if the model is entirely missing
     pricing = PRICING.get(model, PRICING["llama3.2:3b"])
     input_cost = (input_tokens / 1000) * pricing["input"]
     output_cost = (output_tokens / 1000) * pricing["output"]
@@ -103,17 +95,13 @@ def calculate_cost(
     return info
 
 
-# ---------------------------------------------------------------------------
-# Demo
-# ---------------------------------------------------------------------------
 if __name__ == "__main__":
     prompt = "Classify this ticket: My order hasn't arrived after 2 weeks!"
     response = '{"issue_category": "delivery_issue", "priority": "high"}'
 
     in_tokens = count_tokens(prompt)
     out_tokens = count_tokens(response)
-    
-    # Using local model for the demo
+
     cost = calculate_cost("llama3.2:3b", in_tokens, out_tokens)
 
     print(f"Input tokens : {cost.input_tokens}")
@@ -122,3 +110,4 @@ if __name__ == "__main__":
     print(f"Output cost  : ${cost.output_cost_usd:.6f}")
     print(f"Total cost   : ${cost.total_cost_usd:.6f}")
     print(f"Session total: {session_tracker.summary}")
+
