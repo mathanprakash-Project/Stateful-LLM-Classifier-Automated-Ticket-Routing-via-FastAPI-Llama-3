@@ -1,26 +1,29 @@
-# Use official Python lightweight image
+# syntax=docker/dockerfile:1
+FROM ghcr.io/astral-sh/uv:latest AS uv_bin
 FROM python:3.11-slim
 
-# Set working directory inside container
+# Copy uv executable from official uv image
+COPY --from=uv_bin /uv /uvx /bin/
+
+# Set working directory
 WORKDIR /app
 
-# Prevent Python from writing .pyc files & buffer stdout/stderr
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
+# Optimize python behavior
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    UV_SYSTEM_PYTHON=1 \
+    OLLAMA_BASE_URL=http://host.docker.internal:11434
 
-# Default Ollama host for Docker container (points to host machine Ollama)
-ENV OLLAMA_BASE_URL=http://host.docker.internal:11434
+# Install build tools & dependencies with uv
+COPY requirements.txt pyproject.toml ./
+RUN uv pip install --system -r requirements.txt
 
-# Install dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy application code and configuration
+# Copy application source code and .env
 COPY app/ ./app/
-COPY .env .env
+COPY .env* ./
 
-# Expose port FastAPI runs on
+# Expose API port
 EXPOSE 8000
 
-# Start FastAPI server via Uvicorn
+# Start server
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

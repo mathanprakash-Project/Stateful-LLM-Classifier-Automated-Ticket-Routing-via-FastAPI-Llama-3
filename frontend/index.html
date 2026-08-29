@@ -3,511 +3,874 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Support Ticket Classifier | Local AI</title>
+  <title>AI Support Ticket Management System</title>
   <style>
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
 
-:root{
-  --bg:#050816;
-  --panel:rgba(13,20,38,.78);
-  --panel2:rgba(18,27,49,.72);
-  --line:rgba(148,163,184,.13);
-  --line2:rgba(129,140,248,.28);
-  --text:#f8fafc;
-  --muted:#94a3b8;
-  --dim:#64748b;
-  --violet:#8b5cf6;
-  --indigo:#6366f1;
-  --cyan:#22d3ee;
-  --green:#34d399;
-  --amber:#fbbf24;
-  --rose:#fb7185;
-  --shadow:0 30px 90px rgba(0,0,0,.42);
-  --r:24px;
-}
+    :root {
+      --bg: #050816;
+      --card-bg: rgba(15, 23, 42, 0.75);
+      --card-border: rgba(148, 163, 184, 0.14);
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --primary: #6366f1;
+      --primary-hover: #4f46e5;
+      --accent: #22d3ee;
+      --green: #10b981;
+      --amber: #f59e0b;
+      --rose: #f43f5e;
+      --purple: #a855f7;
+      --radius: 16px;
+      --shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.5);
+    }
 
-*{box-sizing:border-box;margin:0;padding:0}
-body{
-  min-height:100vh;
-  color:var(--text);
-  font-family:"DM Sans",Inter,sans-serif;
-  background:
-    radial-gradient(900px 500px at 0% 0%,rgba(99,102,241,.17),transparent 65%),
-    radial-gradient(700px 500px at 100% 0%,rgba(34,211,238,.10),transparent 65%),
-    radial-gradient(600px 500px at 50% 100%,rgba(139,92,246,.08),transparent 70%),
-    var(--bg);
-  -webkit-font-smoothing:antialiased;
-}
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      color: var(--text);
+      font-family: "DM Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+      background: radial-gradient(1000px 600px at 0% 0%, rgba(99, 102, 241, 0.15), transparent 70%),
+                  radial-gradient(800px 500px at 100% 100%, rgba(34, 211, 238, 0.1), transparent 70%),
+                  var(--bg);
+      background-attachment: fixed;
+    }
 
-body::after{
-  content:"";
-  position:fixed;inset:0;pointer-events:none;
-  background-image:linear-gradient(rgba(255,255,255,.018) 1px,transparent 1px),
-                   linear-gradient(90deg,rgba(255,255,255,.018) 1px,transparent 1px);
-  background-size:48px 48px;
-  mask-image:linear-gradient(to bottom,black,transparent);
-}
+    /* Header */
+    header {
+      position: sticky; top: 0; z-index: 50;
+      height: 72px;
+      padding: 0 32px;
+      display: flex; align-items: center; justify-content: space-between;
+      border-bottom: 1px solid var(--card-border);
+      background: rgba(5, 8, 22, 0.85);
+      backdrop-filter: blur(20px);
+    }
 
-header{
-  position:sticky;top:0;z-index:50;
-  height:74px;
-  padding:0 clamp(20px,5vw,72px);
-  display:flex;align-items:center;justify-content:space-between;
-  border-bottom:1px solid var(--line);
-  background:rgba(5,8,22,.68);
-  backdrop-filter:blur(24px);
-}
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .brand-icon {
+      width: 40px; height: 40px; border-radius: 12px;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      display: grid; place-items: center; font-weight: 800; font-size: 1.2rem;
+      box-shadow: 0 0 20px rgba(99, 102, 241, 0.4);
+    }
+    .brand h1 { font-family: "Space Grotesk", sans-serif; font-size: 1.1rem; font-weight: 700; letter-spacing: -0.02em; }
+    .brand span { font-size: 0.72rem; color: var(--text-muted); display: block; }
 
-.brand{display:flex;align-items:center;gap:13px}
-.logo-icon{
-  width:42px;height:42px;display:grid;place-items:center;
-  border-radius:13px;
-  background:linear-gradient(135deg,rgba(139,92,246,.25),rgba(34,211,238,.10));
-  border:1px solid rgba(139,92,246,.34);
-  box-shadow:0 10px 30px rgba(99,102,241,.16);
-}
-.logo-icon svg{width:22px;height:22px}
-header h1{
-  font-family:"Space Grotesk",sans-serif;
-  font-size:1rem;font-weight:700;letter-spacing:-.025em
-}
-.header-sub{display:block;margin-top:2px;color:var(--dim);font-size:.68rem}
-.header-badge{
-  display:flex;align-items:center;gap:8px;
-  padding:7px 12px;border-radius:999px;
-  color:#a7f3d0;background:rgba(52,211,153,.07);
-  border:1px solid rgba(52,211,153,.18);
-  font-size:.68rem;font-weight:700
-}
-.header-badge:before{
-  content:"";width:6px;height:6px;border-radius:50%;
-  background:var(--green);box-shadow:0 0 12px var(--green)
-}
+    .header-actions { display: flex; align-items: center; gap: 16px; }
+    
+    .sse-indicator {
+      display: flex; align-items: center; gap: 6px; font-size: 0.75rem; font-weight: 600;
+      padding: 6px 12px; border-radius: 999px; background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.25); color: #34d399;
+    }
+    .sse-indicator.connected::before {
+      content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--green);
+      box-shadow: 0 0 10px var(--green); animation: pulse 2s infinite;
+    }
+    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
 
-.main{
-  width:min(1480px,100%);
-  margin:auto;
-  padding:42px clamp(20px,5vw,72px) 26px;
-  display:grid;
-  grid-template-columns:minmax(0,.95fr) minmax(0,1.05fr);
-  gap:22px;
-}
+    .user-switcher {
+      display: flex; align-items: center; gap: 8px;
+      background: rgba(30, 41, 59, 0.6); padding: 6px 12px; border-radius: 12px;
+      border: 1px solid var(--card-border); font-size: 0.8rem;
+    }
+    .user-switcher select {
+      background: transparent; border: none; color: var(--text); outline: none; font-weight: 600; cursor: pointer;
+    }
 
-.hero{grid-column:1/-1;padding:4px 2px 14px}
-.eyebrow{
-  display:inline-flex;align-items:center;gap:8px;
-  color:#a78bfa;font-size:.68rem;font-weight:800;
-  text-transform:uppercase;letter-spacing:.15em
-}
-.eyebrow:before{
-  content:"";width:25px;height:1px;
-  background:linear-gradient(90deg,var(--violet),var(--cyan))
-}
-.hero h2{
-  max-width:850px;margin-top:11px;
-  font-family:"Space Grotesk",sans-serif;
-  font-size:clamp(2.2rem,4.4vw,3.7rem);
-  line-height:1.02;letter-spacing:-.06em
-}
-.hero h2 span{
-  background:linear-gradient(90deg,#c4b5fd 0%,#818cf8 45%,#67e8f9 100%);
-  -webkit-background-clip:text;background-clip:text;color:transparent
-}
-.hero p{
-  max-width:700px;margin-top:13px;
-  color:var(--muted);font-size:.9rem;line-height:1.7
-}
+    /* Layout */
+    .app-container {
+      display: flex; min-height: calc(100vh - 72px);
+    }
 
-.panel{
-  position:relative;overflow:hidden;
-  min-height:545px;
-  padding:23px;
-  display:flex;flex-direction:column;gap:18px;
-  border:1px solid var(--line);
-  border-radius:var(--r);
-  background:linear-gradient(145deg,rgba(15,23,42,.82),rgba(7,12,26,.76));
-  box-shadow:var(--shadow);
-  backdrop-filter:blur(22px)
-}
-.panel:before{
-  content:"";position:absolute;width:300px;height:300px;
-  right:-160px;top:-190px;border-radius:50%;
-  background:rgba(99,102,241,.13);filter:blur(55px)
-}
-.panel-title{
-  position:relative;display:flex;align-items:center;gap:9px;
-  font-family:"Space Grotesk";font-size:.86rem;font-weight:700
-}
-.panel-title svg{color:#a78bfa}
+    /* Sidebar */
+    .sidebar {
+      width: 240px; border-right: 1px solid var(--card-border);
+      padding: 24px 16px; display: flex; flex-direction: column; gap: 8px;
+      background: rgba(10, 15, 30, 0.4);
+    }
+    .nav-btn {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 16px; border-radius: 12px; border: 1px solid transparent;
+      background: transparent; color: var(--text-muted); font-size: 0.9rem; font-weight: 600;
+      cursor: pointer; transition: all 0.2s; text-align: left; width: 100%;
+    }
+    .nav-btn:hover { color: var(--text); background: rgba(99, 102, 241, 0.08); border-color: rgba(99, 102, 241, 0.2); }
+    .nav-btn.active { color: #fff; background: linear-gradient(135deg, rgba(99, 102, 241, 0.25), rgba(34, 211, 238, 0.15)); border-color: rgba(99, 102, 241, 0.4); }
 
-.samples{display:flex;flex-wrap:wrap;gap:8px}
-.sample-btn{
-  border:1px solid var(--line);border-radius:12px;
-  padding:8px 12px;color:#cbd5e1;
-  background:rgba(30,41,59,.48);
-  font:600 .72rem "DM Sans";cursor:pointer;transition:.2s
-}
-.sample-btn:hover{
-  color:#fff;border-color:var(--line2);
-  background:rgba(99,102,241,.12);
-  transform:translateY(-1px)
-}
+    /* Content Area */
+    .content-area {
+      flex: 1; padding: 32px clamp(16px, 4vw, 48px); overflow-y: auto;
+    }
 
-textarea{
-  width:100%;min-height:285px;flex:1;resize:vertical;
-  padding:17px 18px;outline:none;
-  border:1px solid var(--line);border-radius:18px;
-  color:#e2e8f0;background:rgba(2,6,23,.50);
-  font:400 .88rem/1.75 "DM Sans";
-  transition:.25s;
-}
-textarea::placeholder{color:#475569}
-textarea:focus{
-  border-color:rgba(129,140,248,.55);
-  box-shadow:0 0 0 4px rgba(99,102,241,.09),inset 0 1px 20px rgba(0,0,0,.15)
-}
+    /* Tab views */
+    .tab-view { display: none; }
+    .tab-view.active { display: block; animation: fadeIn 0.25s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 
-.controls{display:grid;grid-template-columns:155px 1fr;gap:10px}
-select{
-  appearance:none;width:100%;outline:none;
-  border:1px solid var(--line);border-radius:13px;
-  padding:12px 14px;color:#e2e8f0;background:#111827;
-  font:600 .78rem "DM Sans";cursor:pointer
-}
-select:focus{border-color:rgba(129,140,248,.55)}
-.classify-btn{
-  position:relative;overflow:hidden;
-  border:0;border-radius:13px;padding:12px 18px;
-  color:#fff;background:linear-gradient(120deg,#4f46e5,#7c3aed 55%,#0891b2);
-  font:700 .82rem "DM Sans";cursor:pointer;
-  box-shadow:0 13px 30px rgba(79,70,229,.28);
-  transition:.22s
-}
-.classify-btn:after{
-  content:"";position:absolute;top:0;left:-80%;width:50%;height:100%;
-  background:linear-gradient(90deg,transparent,rgba(255,255,255,.22),transparent);
-  transform:skewX(-18deg);transition:.55s
-}
-.classify-btn:hover:after{left:135%}
-.classify-btn:hover{transform:translateY(-2px);box-shadow:0 18px 38px rgba(79,70,229,.36)}
-.classify-btn:active{transform:translateY(0)}
-.classify-btn:disabled{opacity:.55;cursor:not-allowed;transform:none;box-shadow:none}
+    /* Stats Grid */
+    .stats-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 16px; margin-bottom: 28px;
+    }
+    .stat-card {
+      background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--radius);
+      padding: 20px; box-shadow: var(--shadow); backdrop-filter: blur(12px);
+      display: flex; flex-direction: column; gap: 6px; position: relative; overflow: hidden;
+    }
+    .stat-card::after {
+      content: ""; position: absolute; top: 0; right: 0; width: 60px; height: 60px;
+      background: radial-gradient(circle, rgba(99, 102, 241, 0.15), transparent 70%);
+    }
+    .stat-label { font-size: 0.75rem; text-transform: uppercase; font-weight: 700; color: var(--text-dim); letter-spacing: 0.08em; }
+    .stat-val { font-size: 2rem; font-weight: 800; font-family: "Space Grotesk", sans-serif; }
+    .stat-val.open { color: var(--amber); }
+    .stat-val.in-progress { color: var(--accent); }
+    .stat-val.resolved { color: var(--green); }
+    .stat-val.closed { color: var(--text-dim); }
 
-.empty-state{
-  flex:1;min-height:360px;
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  gap:15px;text-align:center;color:var(--dim);padding:30px
-}
-.empty-state svg{
-  width:92px;height:92px;padding:18px;
-  color:#64748b;opacity:.7;border-radius:26px;
-  border:1px solid var(--line);background:rgba(30,41,59,.38)
-}
-.empty-state p{max-width:310px;font-size:.82rem;line-height:1.65}
+    /* Section Cards & Tables */
+    .section-card {
+      background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--radius);
+      padding: 24px; box-shadow: var(--shadow); backdrop-filter: blur(16px); margin-bottom: 24px;
+    }
+    .section-header {
+      display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;
+    }
+    .section-title { font-family: "Space Grotesk", sans-serif; font-size: 1.15rem; font-weight: 700; }
 
-.result-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px}
-.card{
-  min-width:0;padding:16px;
-  border:1px solid var(--line);border-radius:17px;
-  background:linear-gradient(145deg,rgba(30,41,59,.53),rgba(15,23,42,.38));
-  transition:.2s
-}
-.card:hover{border-color:rgba(129,140,248,.25);transform:translateY(-2px)}
-.card-label{
-  margin-bottom:7px;color:#64748b;
-  font-size:.64rem;font-weight:800;text-transform:uppercase;letter-spacing:.12em
-}
-.card-value{
-  color:#f1f5f9;font-size:.9rem;font-weight:650;line-height:1.55;
-  overflow-wrap:anywhere
-}
-.card-wide{grid-column:1/-1}
+    /* Badges */
+    .badge {
+      display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 999px;
+      font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+    }
+    .badge-open { background: rgba(245, 158, 11, 0.12); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
+    .badge-assigned { background: rgba(168, 85, 247, 0.12); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); }
+    .badge-in_progress { background: rgba(34, 211, 238, 0.12); color: #38bdf8; border: 1px solid rgba(34, 211, 238, 0.3); }
+    .badge-escalated { background: rgba(244, 63, 94, 0.12); color: #fb7185; border: 1px solid rgba(244, 63, 94, 0.3); }
+    .badge-resolved { background: rgba(16, 185, 129, 0.12); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
+    .badge-closed { background: rgba(148, 163, 184, 0.12); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.3); }
+    .badge-cancelled { background: rgba(100, 116, 139, 0.12); color: #64748b; border: 1px solid rgba(100, 116, 139, 0.3); }
 
-.badge{
-  display:inline-flex;padding:5px 9px;border-radius:8px;
-  font-size:.64rem;font-weight:800;letter-spacing:.06em
-}
-.priority-low,.sentiment-positive{background:rgba(52,211,153,.09);color:#6ee7b7;border:1px solid rgba(52,211,153,.18)}
-.priority-medium{background:rgba(251,191,36,.09);color:#fde68a;border:1px solid rgba(251,191,36,.18)}
-.priority-high{background:rgba(167,139,250,.10);color:#c4b5fd;border:1px solid rgba(167,139,250,.20)}
-.priority-critical,.sentiment-angry{background:rgba(251,113,133,.09);color:#fda4af;border:1px solid rgba(251,113,133,.20)}
-.sentiment-neutral{background:rgba(34,211,238,.08);color:#67e8f9;border:1px solid rgba(34,211,238,.18)}
-.sentiment-negative{background:rgba(251,146,60,.09);color:#fdba74;border:1px solid rgba(251,146,60,.18)}
+    .badge-low { color: #34d399; }
+    .badge-medium { color: #fbbf24; }
+    .badge-high { color: #f43f5e; font-weight: 800; }
+    .badge-critical { color: #ff0055; font-weight: 800; text-shadow: 0 0 10px rgba(255, 0, 85, 0.5); }
 
-.confidence-bar-wrap{
-  height:8px;margin-top:11px;overflow:hidden;border-radius:999px;background:#1e293b
-}
-.confidence-bar{
-  height:100%;border-radius:999px;
-  background:linear-gradient(90deg,#6366f1,#8b5cf6,#22d3ee);
-  box-shadow:0 0 18px rgba(99,102,241,.38);
-  transition:width .8s cubic-bezier(.22,1,.36,1)
-}
-.human-review-flag{
-  grid-column:1/-1;display:flex;align-items:center;gap:8px;
-  padding:11px 13px;border-radius:12px;
-  color:#fde68a;background:rgba(251,191,36,.06);
-  border:1px solid rgba(251,191,36,.18);
-  font-size:.75rem;font-weight:650
-}
-.error-msg{
-  width:100%;padding:13px;border-radius:12px;
-  color:#fda4af;background:rgba(251,113,133,.06);
-  border:1px solid rgba(251,113,133,.18);
-  font-size:.79rem;line-height:1.5
-}
+    /* Tables */
+    .data-table { width: 100%; border-collapse: collapse; text-align: left; }
+    .data-table th { padding: 12px 16px; font-size: 0.75rem; text-transform: uppercase; color: var(--text-dim); font-weight: 700; border-bottom: 1px solid var(--card-border); }
+    .data-table td { padding: 14px 16px; font-size: 0.85rem; border-bottom: 1px solid rgba(148, 163, 184, 0.08); vertical-align: middle; }
+    .data-table tr:hover td { background: rgba(99, 102, 241, 0.04); }
 
-.status-strip{
-  width:min(1480px,100%);margin:auto;
-  padding:0 clamp(20px,5vw,72px) 34px;
-  display:grid;grid-template-columns:repeat(4,1fr);gap:9px
-}
-.status-item{
-  display:flex;align-items:center;justify-content:space-between;gap:10px;
-  padding:11px 13px;border-radius:13px;
-  border:1px solid var(--line);background:rgba(15,23,42,.45)
-}
-.status-item span.label{
-  color:#64748b;font-size:.62rem;font-weight:800;
-  text-transform:uppercase;letter-spacing:.09em
-}
-.status-item span.value{color:#cbd5e1;font-size:.7rem;font-weight:700;text-align:right}
-.pii-badge,.pii-clean{padding:3px 7px;border-radius:6px;font-size:.61rem;font-weight:800}
-.pii-badge{color:#fda4af;background:rgba(251,113,133,.09)}
-.pii-clean{color:#6ee7b7;background:rgba(52,211,153,.09)}
+    /* Buttons & Inputs */
+    .btn {
+      padding: 10px 18px; border-radius: 12px; font-weight: 700; font-size: 0.85rem;
+      border: none; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 8px;
+    }
+    .btn-primary { background: linear-gradient(135deg, var(--primary), var(--primary-hover)); color: #fff; box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3); }
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 25px rgba(99, 102, 241, 0.4); }
+    .btn-secondary { background: rgba(30, 41, 59, 0.6); color: var(--text); border: 1px solid var(--card-border); }
+    .btn-secondary:hover { background: rgba(51, 65, 85, 0.8); }
+    .btn-success { background: var(--green); color: #fff; }
+    .btn-danger { background: var(--rose); color: #fff; }
 
-.spinner{
-  display:inline-block;width:15px;height:15px;margin-right:7px;
-  vertical-align:-3px;border:2px solid rgba(255,255,255,.25);
-  border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite
-}
-@keyframes spin{to{transform:rotate(360deg)}}
+    .input-field, .select-field, .textarea-field {
+      width: 100%; padding: 12px 16px; border-radius: 12px;
+      border: 1px solid var(--card-border); background: rgba(2, 6, 23, 0.6);
+      color: var(--text); font-family: inherit; font-size: 0.88rem; outline: none; transition: 0.2s;
+    }
+    .input-field:focus, .select-field:focus, .textarea-field:focus {
+      border-color: var(--primary); box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+    }
 
-@media(max-width:1050px){
-  .main{grid-template-columns:1fr}
-  .status-strip{grid-template-columns:1fr 1fr}
-}
-@media(max-width:650px){
-  header{height:66px;padding:0 16px}
-  .header-badge{display:none}
-  .main{padding:28px 16px 20px}
-  .hero h2{font-size:2.3rem}
-  .panel{padding:18px;min-height:510px}
-  .controls{grid-template-columns:1fr}
-  .result-grid{grid-template-columns:1fr}
-  .card-wide{grid-column:auto}
-  .status-strip{padding:0 16px 24px;grid-template-columns:1fr}
-}
+    /* Chat Container */
+    .chat-layout {
+      display: grid; grid-template-columns: 1fr; max-width: 900px; margin: 0 auto;
+      height: calc(100vh - 160px);
+      background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--radius);
+      box-shadow: var(--shadow); overflow: hidden; grid-template-rows: auto 1fr auto;
+    }
+    .chat-header {
+      padding: 16px 24px; border-bottom: 1px solid var(--card-border);
+      display: flex; align-items: center; justify-content: space-between; background: rgba(10, 15, 30, 0.5);
+    }
+    .chat-messages {
+      padding: 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 18px;
+    }
+    .msg-row { display: flex; gap: 12px; max-width: 85%; }
+    .msg-row.user { align-self: flex-end; flex-direction: row-reverse; }
+    .msg-avatar {
+      width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center;
+      font-weight: 800; font-size: 0.8rem; flex-shrink: 0;
+    }
+    .msg-avatar.ai { background: linear-gradient(135deg, var(--primary), var(--accent)); }
+    .msg-avatar.user { background: #334155; }
+    .msg-bubble {
+      padding: 14px 18px; border-radius: 16px; font-size: 0.9rem; line-height: 1.6;
+    }
+    .msg-row.ai .msg-bubble { background: rgba(30, 41, 59, 0.7); border: 1px solid var(--card-border); border-top-left-radius: 4px; }
+    .msg-row.user .msg-bubble { background: linear-gradient(135deg, var(--primary), var(--primary-hover)); color: #fff; border-top-right-radius: 4px; }
 
+    /* Interactive Draft Card in Chat */
+    .draft-card {
+      margin-top: 14px; padding: 20px; border-radius: 14px;
+      background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(99, 102, 241, 0.4);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    }
+    .draft-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .draft-title { font-size: 1rem; font-weight: 700; color: var(--accent); }
+    .draft-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 12px 0; font-size: 0.82rem; }
+    .draft-item span { color: var(--text-dim); display: block; font-size: 0.7rem; text-transform: uppercase; font-weight: 700; }
+    .draft-actions { display: flex; gap: 10px; margin-top: 16px; }
+
+    .chat-input-bar {
+      padding: 16px 24px; border-top: 1px solid var(--card-border); background: rgba(10, 15, 30, 0.6);
+      display: flex; gap: 12px;
+    }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed; inset: 0; z-index: 100; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(8px);
+      display: none; place-items: center; padding: 20px;
+    }
+    .modal-overlay.active { display: grid; }
+    .modal-box {
+      width: min(700px, 100%); background: #0f172a; border: 1px solid var(--card-border);
+      border-radius: var(--radius); padding: 28px; box-shadow: 0 25px 60px rgba(0, 0, 0, 0.6);
+      max-height: 90vh; overflow-y: auto;
+    }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .close-btn { background: none; border: none; color: var(--text-dim); font-size: 1.5rem; cursor: pointer; }
+
+    .timeline { border-left: 2px solid var(--card-border); margin-left: 12px; padding-left: 18px; display: flex; flex-direction: column; gap: 16px; margin-top: 16px; }
+    .timeline-item { position: relative; font-size: 0.82rem; }
+    .timeline-item::before { content: ""; position: absolute; left: -24px; top: 4px; width: 10px; height: 10px; border-radius: 50%; background: var(--primary); }
+
+    /* Responsive */
+    @media (max-width: 800px) {
+      .app-container { flex-direction: column; }
+      .sidebar { width: 100%; flex-direction: row; overflow-x: auto; padding: 12px 16px; }
+      .nav-btn { width: auto; white-space: nowrap; }
+    }
   </style>
 </head>
 <body>
 
 <header>
   <div class="brand">
-  <div class="logo-icon">
-    <svg width="24" height="24" fill="none" viewBox="0 0 24 24">
-      <path stroke="#4f46e5" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
-        d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/>
-    </svg>
+    <div class="brand-icon">AI</div>
+    <div>
+      <h1>SupportHub AI</h1>
+      <span>Intelligent Ticket Operations & Triage</span>
+    </div>
   </div>
-  <div>
-    <h1>Support Ticket Classifier</h1>
-    <span class="header-sub">Intelligent ticket triage & routing</span>
+
+  <div class="header-actions">
+    <div class="sse-indicator connected" id="sseBadge">Live Real-time</div>
+    <div class="user-switcher">
+      <label>User:</label>
+      <select id="userSelector" onchange="switchUser(this.value)">
+        <option value="john@company.com">John Doe (User)</option>
+        <option value="jane@company.com">Jane Smith (User)</option>
+        <option value="bob@company.com">Agent Bob (Agent)</option>
+        <option value="alice@company.com">Manager Alice (Manager)</option>
+        <option value="admin@company.com">Admin Root (Admin)</option>
+      </select>
+    </div>
   </div>
-  </div>
-  <div class="header-badge">Local AI · Ready</div>
 </header>
 
-<div class="main">
-  <section class="hero">
-    <div class="eyebrow">AI-powered support operations</div>
-    <h2>Turn support tickets into <span>actionable decisions.</span></h2>
-    <p>Classify incoming requests, detect sentiment and priority, route them to the right team, and surface cases that need human attention.</p>
-  </section>
+<div class="app-container">
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <button class="nav-btn active" onclick="switchTab('dashboard')">
+      📊 Dashboard
+    </button>
+    <button class="nav-btn" onclick="switchTab('tickets')">
+      🎫 All Tickets
+    </button>
+    <button class="nav-btn" onclick="switchTab('chat')">
+      💬 AI Assistant
+    </button>
+    <button class="nav-btn" onclick="openCreateModal()">
+      ➕ New Ticket
+    </button>
+  </nav>
 
-  <!-- LEFT: Input Panel -->
-  <div class="panel">
-    <div class="panel-title">
-      <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
-      Ticket Input
+  <!-- Main View -->
+  <main class="content-area">
+    
+    <!-- DASHBOARD TAB -->
+    <div id="tab-dashboard" class="tab-view active">
+      <div class="stats-grid">
+        <div class="stat-card">
+          <span class="stat-label">Total Tickets</span>
+          <span class="stat-val" id="statTotal">0</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Open</span>
+          <span class="stat-val open" id="statOpen">0</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">In Progress</span>
+          <span class="stat-val in-progress" id="statInProgress">0</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Resolved</span>
+          <span class="stat-val resolved" id="statResolved">0</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Closed</span>
+          <span class="stat-val closed" id="statClosed">0</span>
+        </div>
+      </div>
+
+      <div class="section-card">
+        <div class="section-header">
+          <h2 class="section-title">Recent Support Activity</h2>
+          <button class="btn btn-secondary" onclick="loadDashboard()">🔄 Refresh</button>
+        </div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Ticket #</th>
+              <th>Title</th>
+              <th>Category</th>
+              <th>Priority</th>
+              <th>Status</th>
+              <th>Created By</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="recentTicketsTable">
+            <tr><td colspan="7" style="text-align:center; color:var(--text-dim);">Loading recent tickets...</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
-    <div class="samples">
-      <button class="sample-btn" onclick="fillSample(0)">📦 Delayed Delivery</button>
-      <button class="sample-btn" onclick="fillSample(1)">💳 Double Charged</button>
-      <button class="sample-btn" onclick="fillSample(2)">🔐 Login Broken</button>
+    <!-- TICKETS TAB -->
+    <div id="tab-tickets" class="tab-view">
+      <div class="section-card">
+        <div class="section-header">
+          <h2 class="section-title">Ticket Registry</h2>
+          <div style="display: flex; gap: 10px;">
+            <input type="text" id="searchInput" class="input-field" placeholder="Search by title or #..." style="width: 220px;" oninput="loadTickets()" />
+            <select id="statusFilter" class="select-field" style="width: 140px;" onchange="loadTickets()">
+              <option value="">All Statuses</option>
+              <option value="open">Open</option>
+              <option value="assigned">Assigned</option>
+              <option value="in_progress">In Progress</option>
+              <option value="escalated">Escalated</option>
+              <option value="resolved">Resolved</option>
+              <option value="closed">Closed</option>
+            </select>
+          </div>
+        </div>
+
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Ticket #</th>
+              <th>Title</th>
+              <th>Category</th>
+              <th>Priority</th>
+              <th>Status</th>
+              <th>Assignee</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="ticketsRegistryTable">
+            <tr><td colspan="7" style="text-align:center; color:var(--text-dim);">Loading tickets...</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
-    <textarea id="ticketText" placeholder="Paste or type a customer support ticket here…"></textarea>
+    <!-- CHAT ASSISTANT TAB -->
+    <div id="tab-chat" class="tab-view">
+      <div class="chat-layout">
+        <div class="chat-header">
+          <div>
+            <h3 style="font-size:1rem; font-weight:700;">AI Grievance & Triage Assistant</h3>
+            <span style="font-size:0.72rem; color:var(--text-dim);">LangGraph Orchestrated Natural Dialogue</span>
+          </div>
+          <button class="btn btn-secondary" onclick="startNewChatSession()">➕ New Chat</button>
+        </div>
 
-    <div class="controls">
-      <select id="channel">
-        <option value="web_form">Web Form</option>
-        <option value="email">Email</option>
-      </select>
-      <button class="classify-btn" id="classifyBtn" onclick="classify()">Classify Ticket</button>
-    </div>
-  </div>
+        <div class="chat-messages" id="chatMessages">
+          <div class="msg-row ai">
+            <div class="msg-avatar ai">AI</div>
+            <div class="msg-bubble">
+              Hello! I am your AI Support Assistant. Tell me about any hardware issue, VPN problem, software bug, or account access trouble you are facing, and I will help triage and prepare a ticket for you.
+            </div>
+          </div>
+        </div>
 
-  <!-- RIGHT: Results Panel -->
-  <div class="panel" id="resultsPanel">
-    <div class="panel-title">
-      <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-      Classification Result
+        <div class="chat-input-bar">
+          <input type="text" id="chatInput" class="input-field" placeholder="Describe your issue (e.g., 'My laptop screen keeps turning off')..." onkeydown="if(event.key==='Enter') sendChatMessage()" />
+          <button class="btn btn-primary" id="chatSendBtn" onclick="sendChatMessage()">Send</button>
+        </div>
+      </div>
     </div>
-    <div class="empty-state" id="emptyState">
-      <svg width="64" height="64" fill="none" viewBox="0 0 24 24">
-        <path stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
-          d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
-      </svg>
-      <p>Submit a ticket to see the local AI classification result</p>
-    </div>
-    <div class="result-grid" id="resultGrid" style="display:none;"></div>
-  </div>
 
+  </main>
 </div>
 
-<!-- BOTTOM: Status strip -->
-<div class="status-strip" id="statusStrip">
-  <div class="status-item">
-    <span class="label">Tokens:</span>
-    <span class="value" id="statusTokens">—</span>
+<!-- MANUAL TICKET CREATION MODAL -->
+<div class="modal-overlay" id="createModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3 style="font-size: 1.2rem; font-weight: 700;">Create Support Ticket</h3>
+      <button class="close-btn" onclick="closeCreateModal()">&times;</button>
+    </div>
+    <form id="createTicketForm" onsubmit="handleManualSubmit(event)" style="display:flex; flex-direction:column; gap:16px;">
+      <div>
+        <label style="font-size: 0.75rem; color: var(--text-dim); font-weight:700;">TITLE</label>
+        <input type="text" id="tTitle" class="input-field" placeholder="Brief summary of the issue" required />
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+        <div>
+          <label style="font-size: 0.75rem; color: var(--text-dim); font-weight:700;">CATEGORY</label>
+          <select id="tCategory" class="select-field" required onchange="populateSubcategories()">
+            <option value="">Select Category</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size: 0.75rem; color: var(--text-dim); font-weight:700;">SUBCATEGORY</label>
+          <select id="tSubcategory" class="select-field">
+            <option value="">Select Subcategory</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label style="font-size: 0.75rem; color: var(--text-dim); font-weight:700;">PRIORITY</label>
+        <select id="tPriority" class="select-field">
+          <option value="low">Low (Standard request)</option>
+          <option value="medium" selected>Medium (Normal priority)</option>
+          <option value="high">High (Affects regular work)</option>
+          <option value="critical">Critical (Complete outage/blocker)</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size: 0.75rem; color: var(--text-dim); font-weight:700;">DESCRIPTION</label>
+        <textarea id="tDesc" class="textarea-field" rows="4" placeholder="Detailed explanation of the issue and error codes..." required></textarea>
+      </div>
+      <div style="display:flex; justify-content: flex-end; gap: 10px; margin-top: 12px;">
+        <button type="button" class="btn btn-secondary" onclick="closeCreateModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Create Ticket</button>
+      </div>
+    </form>
   </div>
-  <div class="status-item">
-    <span class="label">Cost:</span>
-    <span class="value" id="statusCost">—</span>
-  </div>
-  <div class="status-item">
-    <span class="label">PII Scrubbing:</span>
-    <span class="value" id="statusPii">—</span>
-  </div>
-  <div class="status-item">
-    <span class="label">Active Prompt:</span>
-    <span class="value" id="statusPrompt">—</span>
+</div>
+
+<!-- TICKET DETAIL MODAL -->
+<div class="modal-overlay" id="detailModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <div>
+        <h3 id="dtTicketNumber" style="font-size: 1.2rem; font-weight: 700; color: var(--accent);">TKT-0000</h3>
+        <span id="dtTitle" style="font-size: 0.9rem; color: var(--text-muted);"></span>
+      </div>
+      <button class="close-btn" onclick="closeDetailModal()">&times;</button>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; background: rgba(30,41,59,0.4); padding: 14px; border-radius: 12px;">
+      <div><span style="font-size:0.7rem; color:var(--text-dim); font-weight:700;">STATUS</span><div id="dtStatus"></div></div>
+      <div><span style="font-size:0.7rem; color:var(--text-dim); font-weight:700;">PRIORITY</span><div id="dtPriority"></div></div>
+      <div><span style="font-size:0.7rem; color:var(--text-dim); font-weight:700;">CATEGORY</span><div id="dtCategory" style="font-weight:600;"></div></div>
+    </div>
+
+    <div style="margin-bottom: 20px;">
+      <h4 style="font-size:0.8rem; font-weight:700; color:var(--text-dim); text-transform:uppercase; margin-bottom:6px;">Description</h4>
+      <p id="dtDesc" style="font-size:0.9rem; line-height:1.6; background: rgba(2,6,23,0.4); padding:14px; border-radius:10px; white-space:pre-wrap;"></p>
+    </div>
+
+    <!-- Status transition controller -->
+    <div style="margin-bottom: 24px; padding: 16px; border: 1px solid var(--card-border); border-radius: 12px; background: rgba(15,23,42,0.6);">
+      <h4 style="font-size:0.8rem; font-weight:700; color:var(--accent); text-transform:uppercase; margin-bottom:10px;">Lifecycle Transition</h4>
+      <div style="display: flex; gap: 10px;">
+        <select id="transitionSelect" class="select-field" style="max-width: 200px;">
+          <option value="in_progress">In Progress</option>
+          <option value="assigned">Assigned</option>
+          <option value="resolved">Resolved</option>
+          <option value="closed">Closed</option>
+          <option value="cancelled">Cancelled</option>
+          <option value="reopened">Reopened</option>
+        </select>
+        <button class="btn btn-primary" onclick="applyStatusTransition()">Update Status</button>
+      </div>
+    </div>
+
+    <!-- Comments & Timeline -->
+    <div>
+      <h4 style="font-size:0.8rem; font-weight:700; color:var(--text-dim); text-transform:uppercase; margin-bottom:10px;">Audit Timeline & History</h4>
+      <div class="timeline" id="dtHistory"></div>
+    </div>
   </div>
 </div>
 
 <script>
-const SAMPLES = [
-  {
-    channel: "web_form",
-    text: "I am absolutely furious! My package was supposed to arrive 5 days ago and it still hasn't shown up. I've been waiting at home all week. This is completely unacceptable. Order #98765. I want an immediate update or a full refund!\nEmail: customer@xyzmail.com \nCredit card number: 1234567890123456",
-  },
-  {
-    channel: "email",
-    text: "Subject: Double charge on my account\n\nHello,\n\nI noticed I was charged twice for the same order (#44321) placed on March 15th. Both charges of $89.99 appear on my bank statement. Please refund one of the charges immediately. This is very concerning.\n\nThank you,\nA frustrated customer",
-  },
-  {
-    channel: "web_form",
-    text: "I can't log into my account at all. I keep getting 'Invalid credentials' even though I just reset my password 3 times. I need to access my order history urgently. Please help — I've been locked out for 2 days.",
-  },
-];
+const API_BASE = "http://localhost:8000";
+let currentUserToken = null;
+let currentChatSessionId = null;
+let categoriesCache = [];
+let activeTicketId = null;
 
-function fillSample(index) {
-  const s = SAMPLES[index];
-  document.getElementById("ticketText").value = s.text;
-  document.getElementById("channel").value = s.channel;
+// Initialization
+async function initApp() {
+  await switchUser("john@company.com");
+  await loadCategories();
+  initSSE();
 }
 
-function priorityClass(p) {
-  return { low: "priority-low", medium: "priority-medium", high: "priority-high", critical: "priority-critical" }[p] || "";
-}
-function sentimentClass(s) {
-  return { positive: "sentiment-positive", neutral: "sentiment-neutral", negative: "sentiment-negative", angry: "sentiment-angry" }[s] || "";
-}
-function formatCategory(s) {
-  return s.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
-}
-
-async function classify() {
-  const text = document.getElementById("ticketText").value.trim();
-  if (!text) { alert("Please enter a ticket."); return; }
-
-  const btn = document.getElementById("classifyBtn");
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span>Classifying…';
-
-  document.getElementById("emptyState").style.display = "flex";
-  document.getElementById("resultGrid").style.display = "none";
-
+async function switchUser(email) {
   try {
-    const resp = await fetch("http://localhost:8000/classify", {
+    const res = await fetch(`${API_BASE}/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ticket_text: text, channel: document.getElementById("channel").value }),
+      body: JSON.stringify({ email: email, password: "password123" })
     });
-
-    if (!resp.ok) {
-      const err = await resp.json();
-      throw new Error(err.detail || resp.statusText);
-    }
-
-    const data = await resp.json();
-    renderResult(data);
+    if (!res.ok) throw new Error("Login failed");
+    const data = await res.json();
+    currentUserToken = data.access_token;
+    loadDashboard();
+    loadTickets();
   } catch (e) {
-    document.getElementById("emptyState").innerHTML =
-      `<div class="error-msg">Error: ${e.message}</div>`;
-  } finally {
-    btn.disabled = false;
-    btn.textContent = "Classify Ticket";
+    console.error("Auth error:", e);
   }
 }
 
-function renderResult(d) {
-  const grid = document.getElementById("resultGrid");
-  const confPct = Math.round(d.confidence_score * 100);
-
-  grid.innerHTML = `
-    <div class="card">
-      <div class="card-label">Category</div>
-      <div class="card-value">${formatCategory(d.issue_category)}</div>
-    </div>
-    <div class="card">
-      <div class="card-label">Assigned Team</div>
-      <div class="card-value">${formatCategory(d.assigned_team)}</div>
-    </div>
-    <div class="card">
-      <div class="card-label">Priority</div>
-      <div class="card-value">
-        <span class="badge ${priorityClass(d.priority)}">${d.priority.toUpperCase()}</span>
-      </div>
-    </div>
-    <div class="card">
-      <div class="card-label">Sentiment</div>
-      <div class="card-value">
-        <span class="badge ${sentimentClass(d.user_sentiment)}">${d.user_sentiment.toUpperCase()}</span>
-      </div>
-    </div>
-    <div class="card card-wide">
-      <div class="card-label">Confidence Score — ${confPct}%</div>
-      <div class="confidence-bar-wrap">
-        <div class="confidence-bar" style="width:${confPct}%"></div>
-      </div>
-    </div>
-    <div class="card card-wide">
-      <div class="card-label">Reasoning</div>
-      <div class="card-value" style="font-weight:400;font-size:0.95rem;line-height:1.5;color:var(--text-secondary)">${d.reasoning}</div>
-    </div>
-    ${d.requires_human_review ? '<div class="human-review-flag"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg> Flagged for human review</div>' : ""}
-    ${d.injection_blocked ? '<div class="human-review-flag" style="background:#fef2f2;color:#dc2626;border-color:#fecaca"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path></svg> Injection attempt blocked</div>' : ""}
-  `;
-
-  const cost = d.cost_info;
-  document.getElementById("statusTokens").textContent =
-    cost ? `${cost.input_tokens} in / ${cost.output_tokens} out` : "—";
-  document.getElementById("statusCost").textContent =
-    cost ? `$${cost.total_cost_usd.toFixed(6)}` : "—";
-  document.getElementById("statusPii").innerHTML =
-    d.pii_detected
-      ? '<span class="pii-badge">DETECTED</span>'
-      : '<span class="pii-clean">CLEAN</span>';
-  document.getElementById("statusPrompt").textContent = d.prompt_version || "—";
-
-  document.getElementById("emptyState").style.display = "none";
-  grid.style.display = "grid";
+function getHeaders() {
+  return {
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${currentUserToken}`
+  };
 }
+
+// Tabs
+function switchTab(tabId) {
+  document.querySelectorAll(".tab-view").forEach(el => el.classList.remove("active"));
+  document.querySelectorAll(".nav-btn").forEach(el => el.classList.remove("active"));
+  
+  document.getElementById(`tab-${tabId}`).classList.add("active");
+  event?.currentTarget?.classList.add("active");
+
+  if (tabId === "dashboard") loadDashboard();
+  if (tabId === "tickets") loadTickets();
+  if (tabId === "chat" && !currentChatSessionId) startNewChatSession();
+}
+
+// Categories
+async function loadCategories() {
+  try {
+    const res = await fetch(`${API_BASE}/categories`);
+    categoriesCache = await res.json();
+    const select = document.getElementById("tCategory");
+    select.innerHTML = '<option value="">Select Category</option>' +
+      categoriesCache.map(c => `<option value="${c.id}">${c.name}</option>`).join("");
+  } catch (e) { console.error("Categories error:", e); }
+}
+
+function populateSubcategories() {
+  const catId = document.getElementById("tCategory").value;
+  const subSelect = document.getElementById("tSubcategory");
+  const cat = categoriesCache.find(c => c.id === catId);
+  if (cat && cat.subcategories.length) {
+    subSelect.innerHTML = '<option value="">Select Subcategory</option>' +
+      cat.subcategories.map(s => `<option value="${s.id}">${s.name}</option>`).join("");
+  } else {
+    subSelect.innerHTML = '<option value="">No subcategories</option>';
+  }
+}
+
+// Dashboard
+async function loadDashboard() {
+  try {
+    const res = await fetch(`${API_BASE}/dashboard/stats`, { headers: getHeaders() });
+    if (!res.ok) return;
+    const stats = await res.json();
+
+    document.getElementById("statTotal").textContent = stats.total_tickets;
+    document.getElementById("statOpen").textContent = stats.open_tickets;
+    document.getElementById("statInProgress").textContent = stats.in_progress_tickets;
+    document.getElementById("statResolved").textContent = stats.resolved_tickets;
+    document.getElementById("statClosed").textContent = stats.closed_tickets;
+
+    const tbody = document.getElementById("recentTicketsTable");
+    if (!stats.recent_tickets.length) {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:var(--text-dim);">No tickets created yet.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = stats.recent_tickets.map(t => `
+      <tr>
+        <td><strong style="color:var(--accent);">${t.ticket_number}</strong></td>
+        <td>${t.title}</td>
+        <td>${t.category_name || '—'}</td>
+        <td><span class="badge badge-${t.priority}">${t.priority}</span></td>
+        <td><span class="badge badge-${t.status}">${t.status.replace('_', ' ')}</span></td>
+        <td>${t.creator_name || 'User'}</td>
+        <td><button class="btn btn-secondary" style="padding:4px 10px; font-size:0.75rem;" onclick="viewTicketDetail('${t.id}')">View</button></td>
+      </tr>
+    `).join("");
+  } catch (e) { console.error(e); }
+}
+
+// Tickets Registry
+async function loadTickets() {
+  try {
+    const search = document.getElementById("searchInput").value;
+    const status = document.getElementById("statusFilter").value;
+    let url = `${API_BASE}/tickets?page=1&per_page=50`;
+    if (search) url += `&search=${encodeURIComponent(search)}`;
+    if (status) url += `&status=${encodeURIComponent(status)}`;
+
+    const res = await fetch(url, { headers: getHeaders() });
+    if (!res.ok) return;
+    const data = await res.json();
+
+    const tbody = document.getElementById("ticketsRegistryTable");
+    if (!data.items.length) {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:var(--text-dim);">No matching tickets found.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = data.items.map(t => `
+      <tr>
+        <td><strong style="color:var(--accent);">${t.ticket_number}</strong></td>
+        <td>${t.title}</td>
+        <td>${t.category_name || '—'}</td>
+        <td><span class="badge badge-${t.priority}">${t.priority}</span></td>
+        <td><span class="badge badge-${t.status}">${t.status.replace('_', ' ')}</span></td>
+        <td>${t.assignee_name || '<em style="color:var(--text-dim)">Unassigned</em>'}</td>
+        <td><button class="btn btn-secondary" style="padding:4px 10px; font-size:0.75rem;" onclick="viewTicketDetail('${t.id}')">Inspect</button></td>
+      </tr>
+    `).join("");
+  } catch (e) { console.error(e); }
+}
+
+// Manual Creation Modal
+function openCreateModal() { document.getElementById("createModal").classList.add("active"); }
+function closeCreateModal() { document.getElementById("createModal").classList.remove("active"); }
+
+async function handleManualSubmit(e) {
+  e.preventDefault();
+  const payload = {
+    title: document.getElementById("tTitle").value,
+    description: document.getElementById("tDesc").value,
+    category_id: document.getElementById("tCategory").value,
+    subcategory_id: document.getElementById("tSubcategory").value || null,
+    priority: document.getElementById("tPriority").value,
+  };
+
+  try {
+    const res = await fetch(`${API_BASE}/tickets`, {
+      method: "POST",
+      headers: getHeaders(),
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      alert("Error: " + (err.error?.message || "Failed to create ticket"));
+      return;
+    }
+    closeCreateModal();
+    document.getElementById("createTicketForm").reset();
+    loadDashboard();
+    loadTickets();
+  } catch (err) { alert(err.message); }
+}
+
+// Ticket Details
+async function viewTicketDetail(ticketId) {
+  activeTicketId = ticketId;
+  try {
+    const res = await fetch(`${API_BASE}/tickets/${ticketId}`, { headers: getHeaders() });
+    if (!res.ok) return;
+    const t = await res.json();
+
+    document.getElementById("dtTicketNumber").textContent = t.ticket_number;
+    document.getElementById("dtTitle").textContent = t.title;
+    document.getElementById("dtDesc").textContent = t.description;
+    document.getElementById("dtCategory").textContent = t.category?.name || 'General';
+    document.getElementById("dtStatus").innerHTML = `<span class="badge badge-${t.status}">${t.status.replace('_', ' ')}</span>`;
+    document.getElementById("dtPriority").innerHTML = `<span class="badge badge-${t.priority}">${t.priority}</span>`;
+
+    const hist = document.getElementById("dtHistory");
+    hist.innerHTML = t.history.map(h => `
+      <div class="timeline-item">
+        <strong>${h.field_name.toUpperCase()}</strong>: ${h.old_value || 'None'} → <span style="color:var(--accent); font-weight:700;">${h.new_value}</span>
+        <div style="font-size:0.7rem; color:var(--text-dim);">${new Date(h.created_at).toLocaleString()} by ${h.changed_by?.full_name || 'System'}</div>
+      </div>
+    `).join("") || '<div style="color:var(--text-dim);">No history events yet.</div>';
+
+    document.getElementById("detailModal").classList.add("active");
+  } catch (e) { console.error(e); }
+}
+
+function closeDetailModal() { document.getElementById("detailModal").classList.remove("active"); }
+
+async function applyStatusTransition() {
+  if (!activeTicketId) return;
+  const status = document.getElementById("transitionSelect").value;
+  try {
+    const res = await fetch(`${API_BASE}/tickets/${activeTicketId}`, {
+      method: "PATCH",
+      headers: getHeaders(),
+      body: JSON.stringify({ status: status, comment: `Transitioned to ${status}` })
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      alert(err.error?.message || "Status transition not allowed for your role.");
+      return;
+    }
+    viewTicketDetail(activeTicketId);
+    loadDashboard();
+    loadTickets();
+  } catch (e) { alert(e.message); }
+}
+
+// Chat & AI Assistant
+async function startNewChatSession() {
+  try {
+    const res = await fetch(`${API_BASE}/chat/sessions`, {
+      method: "POST",
+      headers: getHeaders()
+    });
+    if (!res.ok) return;
+    const session = await res.json();
+    currentChatSessionId = session.id;
+    document.getElementById("chatMessages").innerHTML = `
+      <div class="msg-row ai">
+        <div class="msg-avatar ai">AI</div>
+        <div class="msg-bubble">
+          Hello! I am your AI Support Assistant. Tell me about any hardware issue, VPN problem, software bug, or account access trouble you are facing, and I will help triage and prepare a ticket for you.
+        </div>
+      </div>
+    `;
+  } catch (e) { console.error(e); }
+}
+
+async function sendChatMessage() {
+  const input = document.getElementById("chatInput");
+  const text = input.value.trim();
+  if (!text || !currentChatSessionId) return;
+
+  input.value = "";
+  appendChatMessage("user", text);
+
+  const btn = document.getElementById("chatSendBtn");
+  btn.disabled = true;
+  btn.textContent = "Thinking...";
+
+  try {
+    const res = await fetch(`${API_BASE}/chat/sessions/${currentChatSessionId}/messages`, {
+      method: "POST",
+      headers: getHeaders(),
+      body: JSON.stringify({ content: text })
+    });
+    if (!res.ok) throw new Error("Chat error");
+    const data = await res.json();
+    appendChatMessage("ai", data.response, data.draft);
+  } catch (e) {
+    appendChatMessage("ai", "I apologize, but I encountered an issue processing your request: " + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Send";
+  }
+}
+
+function appendChatMessage(role, content, draft) {
+  const container = document.getElementById("chatMessages");
+  const row = document.createElement("div");
+  row.className = `msg-row ${role}`;
+
+  let draftCardHtml = "";
+  if (draft) {
+    const d = draft.draft_data;
+    draftCardHtml = `
+      <div class="draft-card" id="draft-${draft.id}">
+        <div class="draft-header">
+          <span class="draft-title">📋 AI Generated Ticket Draft</span>
+          <span class="badge badge-open">Pending Approval</span>
+        </div>
+        <div class="draft-grid">
+          <div class="draft-item"><span>Title</span><strong>${d.title}</strong></div>
+          <div class="draft-item"><span>Category</span><strong>${d.category_name || 'General'}</strong></div>
+          <div class="draft-item"><span>Priority</span><strong class="badge-${d.priority}">${d.priority.toUpperCase()}</strong></div>
+          <div class="draft-item"><span>Affected System</span><strong>${d.meta_info?.affected_system || 'General'}</strong></div>
+        </div>
+        <div style="font-size:0.82rem; margin-top:8px;">
+          <span style="color:var(--text-dim); font-size:0.7rem; font-weight:700; text-transform:uppercase;">Description</span>
+          <p style="background:rgba(2,6,23,0.5); padding:8px 12px; border-radius:8px; margin-top:4px;">${d.description}</p>
+        </div>
+        <div class="draft-actions">
+          <button class="btn btn-success" onclick="approveDraft('${draft.id}')">✓ Approve & Create Ticket</button>
+          <button class="btn btn-danger" onclick="rejectDraft('${draft.id}')">✕ Reject</button>
+        </div>
+      </div>
+    `;
+  }
+
+  row.innerHTML = `
+    <div class="msg-avatar ${role}">${role === 'ai' ? 'AI' : 'U'}</div>
+    <div class="msg-bubble">
+      ${content.replace(/\n/g, '<br/>')}
+      ${draftCardHtml}
+    </div>
+  `;
+  container.appendChild(row);
+  container.scrollTop = container.scrollHeight;
+}
+
+async function approveDraft(draftId) {
+  try {
+    const res = await fetch(`${API_BASE}/chat/sessions/${currentChatSessionId}/drafts/${draftId}/approve`, {
+      method: "POST",
+      headers: getHeaders()
+    });
+    if (!res.ok) throw new Error("Approval failed");
+    const data = await res.json();
+    const card = document.getElementById(`draft-${draftId}`);
+    if (card) {
+      card.innerHTML = `<div style="color:var(--green); font-weight:700; padding:10px;">✓ Ticket ${data.ticket_number} created successfully and added to the dashboard!</div>`;
+    }
+    loadDashboard();
+    loadTickets();
+  } catch (e) { alert(e.message); }
+}
+
+async function rejectDraft(draftId) {
+  try {
+    await fetch(`${API_BASE}/chat/sessions/${currentChatSessionId}/drafts/${draftId}/reject`, {
+      method: "POST",
+      headers: getHeaders()
+    });
+    const card = document.getElementById(`draft-${draftId}`);
+    if (card) {
+      card.innerHTML = `<div style="color:var(--rose); font-weight:700; padding:10px;">✕ Draft rejected.</div>`;
+    }
+  } catch (e) { alert(e.message); }
+}
+
+// SSE real-time stream
+function initSSE() {
+  const eventSource = new EventSource(`${API_BASE}/events/stream`);
+  eventSource.addEventListener("ticket_created", e => {
+    loadDashboard();
+    loadTickets();
+  });
+  eventSource.addEventListener("ticket_updated", e => {
+    loadDashboard();
+    loadTickets();
+    if (activeTicketId) viewTicketDetail(activeTicketId);
+  });
+}
+
+// Start
+initApp();
 </script>
 </body>
 </html>
-
