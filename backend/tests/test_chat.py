@@ -85,4 +85,4 @@ async def test_out_of_scope_message_rejected(client: AsyncClient):
     assert msg_resp.status_code == 200
     data = msg_resp.json()
     assert data.get("draft") is None
-    assert "technical IT support" in data["response"] or "cannot create support tickets" in data["response"]
+    assert "technical IT support" in data["response"] or "cannot create support tickets" in data["response"] or "non-technical" in data["response"].lower()

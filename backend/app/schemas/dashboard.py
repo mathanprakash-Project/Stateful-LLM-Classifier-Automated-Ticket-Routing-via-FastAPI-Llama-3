@@ -31,6 +31,8 @@ class DashboardStats(BaseModel):
     resolved_tickets: int
     closed_tickets: int
     escalated_tickets: int
+    pending_routing_tickets: int = 0
+    pending_approval_tickets: int = 0
     priority_distribution: List[PriorityMetric] = []
     category_distribution: List[CategoryMetric] = []
     recent_tickets: List[TicketListSummary] = []

@@ -2,6 +2,7 @@
 Chat service managing conversation history, agent execution, draft management, and human approval.
 """
 
+import logging
 from typing import Any, Dict, List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,6 +13,8 @@ from app.repositories.category_repo import CategoryRepository
 from app.repositories.chat_repo import ChatRepository
 from app.schemas.ticket import TicketCreate
 from app.services.ticket_service import TicketService
+
+logger = logging.getLogger(__name__)
 
 
 class ChatService:
@@ -52,6 +55,8 @@ class ChatService:
             for m in session.messages
         ]
 
+        logger.info("[CHAT_TURN_START] session_id=%s, current_state=%s, user_msg=%s", session.id, session.agent_state, message_text)
+
         # 3. Run agent turn
         agent_res = await run_chat_turn(
             session_id=session.id,
@@ -61,6 +66,8 @@ class ChatService:
             existing_messages=existing_msgs,
             current_state=session.agent_state or {},
         )
+
+        logger.info("[CHAT_TURN_END] agent_res intent=%s, act=%s, missing=%s, draft=%s", agent_res.get("intent"), agent_res.get("activity_code"), agent_res.get("missing_fields"), bool(agent_res.get("draft")))
 
         response_text = agent_res.get("response_text", "Thank you for the update.")
         draft_data = agent_res.get("draft")
@@ -136,6 +143,15 @@ class ChatService:
             subcategory_id=data.get("subcategory_id"),
             priority=data.get("priority", "medium"),
             meta_info=data.get("meta_info", {}),
+            activity_code=data.get("activity_code"),
+            technical_scope=data.get("technical_scope"),
+            responsible_team=data.get("responsible_team"),
+            requires_admin_approval=data.get("requires_admin_approval", False),
+            execution_mode=data.get("execution_mode", "Online"),
+            downtime_required=data.get("downtime_required", False),
+            downtime_acknowledged=True,
+            prerequisites_confirmed=True,
+            prerequisites_notes="Prerequisites and downtime confirmed via AI Chat conversation.",
         )
 
         ticket = await self.ticket_service.create_ticket(user, ticket_in)

@@ -26,4 +26,6 @@ async def test_dashboard_stats(client: AsyncClient):
     assert "resolved_tickets" in stats
     assert "closed_tickets" in stats
     assert "recent_tickets" in stats
+    assert "pending_routing_tickets" in stats
+    assert "pending_approval_tickets" in stats
 

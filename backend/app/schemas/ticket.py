@@ -18,6 +18,16 @@ class TicketCreate(BaseModel):
     priority: str = Field(default="medium", pattern="^(low|medium|high|critical)$")
     meta_info: dict[str, Any] = Field(default_factory=dict)
     idempotency_key: Optional[str] = None
+    activity_code: str | None = None
+    technical_scope: str | None = None
+    operation_status: str | None = None
+    responsible_team: str | None = None
+    requires_admin_approval: bool = False
+    execution_mode: str | None = "Online"
+    downtime_required: bool = False
+    downtime_acknowledged: bool = False
+    prerequisites_confirmed: bool = False
+    prerequisites_notes: str | None = None
 
 
 class TicketUpdate(BaseModel):
@@ -26,11 +36,13 @@ class TicketUpdate(BaseModel):
     category_id: Optional[str] = None
     subcategory_id: Optional[str] = None
     priority: Optional[str] = Field(None, pattern="^(low|medium|high|critical)$")
-    status: Optional[str] = Field(None, pattern="^(draft|open|assigned|in_progress|escalated|resolved|closed|reopened|cancelled)$")
+    status: Optional[str] = Field(None, pattern="^(draft|open|assigned|in_progress|escalated|resolved|closed|reopened|cancelled|pending_manager_routing|pending_admin_approval|approved|rejected|routed)$")
     assigned_to_id: Optional[str] = None
     comment: Optional[str] = None
     change_reason: Optional[str] = None
     version: Optional[int] = None
+    operation_status: Optional[str] = None
+    prerequisites_notes: Optional[str] = None
 
 
 class TicketCommentCreate(BaseModel):
@@ -89,6 +101,17 @@ class TicketResponse(BaseModel):
     closed_at: Optional[datetime] = None
     comments: List[TicketCommentResponse] = []
     history: List[TicketHistoryResponse] = []
+    activity_code: str | None = None
+    technical_scope: str | None = None
+    operation_status: str | None = None
+    responsible_team: str | None = None
+    requires_admin_approval: bool = False
+    routed_to_team: str | None = None
+    execution_mode: str | None = None
+    downtime_required: bool = False
+    downtime_acknowledged: bool = False
+    prerequisites_confirmed: bool = False
+    prerequisites_notes: str | None = None
 
 
 class TicketListSummary(BaseModel):
@@ -99,9 +122,21 @@ class TicketListSummary(BaseModel):
     title: str
     priority: str
     status: str
+    created_at: datetime
+    updated_at: datetime
     category_name: Optional[str] = None
     creator_name: Optional[str] = None
     assignee_name: Optional[str] = None
-    created_at: datetime
-    updated_at: datetime
+    activity_code: str | None = None
+    operation_status: str | None = None
+    requires_admin_approval: bool = False
+    execution_mode: str | None = None
+    downtime_required: bool = False
 
+
+class TicketListResponse(BaseModel):
+    items: List[TicketListSummary]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int

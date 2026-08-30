@@ -34,6 +34,8 @@ services:
       LLM_PROVIDER: ollama
     ports:
       - "8000:8000"
+    volumes:
+      - ./backend/app:/app/app
     extra_hosts:
       - "host.docker.internal:host-gateway"
 

@@ -55,7 +55,9 @@ class AITicketDraft(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         String(36), ForeignKey("chat_sessions.id", ondelete="CASCADE"), nullable=False, index=True
     )
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False, index=True)
-    ticket_id: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("tickets.id"), nullable=True)
+    ticket_id: Mapped[Optional[str]] = mapped_column(
+        String(36), ForeignKey("tickets.id", ondelete="SET NULL"), nullable=True
+    )
     status: Mapped[str] = mapped_column(String(20), default="pending_review", nullable=False)  # pending_review, approved, rejected, expired
     draft_data: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
     revision: Mapped[int] = mapped_column(Integer, default=1, nullable=False)

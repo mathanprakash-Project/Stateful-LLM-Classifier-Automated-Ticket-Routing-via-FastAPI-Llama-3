@@ -10,6 +10,8 @@ from app.agents.prompts.system_prompts import (
     DIAGNOSTIC_QUESTION_PROMPT,
     DRAFT_PRESENTATION_PROMPT,
     OUT_OF_SCOPE_RESPONSE_PROMPT,
+    MANAGER_ROUTING_RESPONSE_PROMPT,
+    RESTRICTED_OPERATION_RESPONSE_PROMPT,
 )
 from app.agents.state import AgentState
 from app.config.settings import settings
@@ -37,8 +39,8 @@ async def generate_response_node(state: AgentState) -> Dict[str, Any]:
                 last_user_msg = m.get("content", "")
                 break
 
-    # 1. Out-of-scope / non-IT topic handler
-    if intent == "out_of_scope":
+    # 1. Out-of-scope / non-technical topic handler
+    if intent in ("out_of_scope", "NON_TECHNICAL"):
         if settings.LLM_PROVIDER != "mock":
             prompt = (
                 f"{OUT_OF_SCOPE_RESPONSE_PROMPT}\n\n"
@@ -64,42 +66,78 @@ async def generate_response_node(state: AgentState) -> Dict[str, Any]:
         )
         return {"response_text": response_text}
 
-    # 3. General query / greetings handler
+    # 3. General query / greetings / activity list handler
     if intent == "general_query":
         response_text = (
-            "👋 **Hello! I'm your AI IT Support Specialist.**\n\n"
-            "I can assist you with:\n"
-            "- 💻 **Hardware Issues** (Laptops, Monitors, Peripherals, Docking stations)\n"
-            "- ⚙️ **Software Problems** (OS crashes, application errors, licenses, installations)\n"
-            "- 🌐 **Network & Connectivity** (Wi-Fi, Fiber/Broadband, VPN, Slow internet)\n"
-            "- 🔐 **Access & Security** (Password resets, MFA/2FA devices, Permissions)\n\n"
-            "How can I help you today? Please describe what technical problem you are experiencing."
+            "👋 **Hello! I'm your Enterprise Application Support AI Specialist.**\n\n"
+            "### 🛠️ **Operational Maintenance Activities Overview**\n\n"
+            "| Activity | Execution Mode | Downtime Required? | Customer Impact & Summary |\n"
+            "| :--- | :--- | :--- | :--- |\n"
+            "| **Application Versioning** (`APPLICATION_VERSION`) | Offline | **Yes** (Planned Downtime) | System executables and engine files are locked while running; all services must be stopped to apply core runtime upgrades. *(Requires Admin Approval)* |\n"
+            "| **Client Data Transfer** (`CLIENT_DATA_TRANSFER`) | Hybrid | **No Full Downtime** (User Lockout) | System remains powered on, but active users are locked out from target/source environments to avoid data conflicts. *(Requires Admin Approval)* |\n"
+            "| **File Management** (`FILE_MANAGEMENT`) | Online | **No Downtime** | Background housekeeping scripts clean, archive, and transfer host files seamlessly while normal business continues. |\n"
+            "| **UI Change and Issues** (`APPLICATION_UI`) | Online | **No Downtime** | Screen adaptations, layout enhancements, and UI error fixes deploy directly with zero business disruption. |\n"
+            "| **General Support** (`APPLICATION_OTHER`) | Online | **No Downtime** | Daily account access, performance guidance, and feature requests. |\n\n"
+            "---\n\n"
+            "### 💡 **How Our Operations Work:**\n"
+            "- **Application Versioning**: *Think of this as upgrading the engine of a car. Because we are replacing core moving parts, the system must be turned off briefly during the maintenance window.*\n"
+            "- **Client Data Transfer**: *The system stays on, but user logins in the target test system are temporarily locked to prevent partial entries from corrupting the transfer.*\n"
+            "- **File Management**: *Automated background housekeeping running scheduled archiving scripts with zero user interruption.*\n"
+            "- **UI Changes & Issues**: *Screen layout adjustments and error fixes published in real time with instant page refresh.*\n\n"
+            "### 🏢 **Out-of-Scope (Infrastructure, Database, Network, Security):**\n"
+            "Requests for database modifications, physical server restarts, or corporate firewalls will be reviewed and routed by **Managers** to the appropriate infrastructure engineering teams.\n\n"
+            "💬 *Please describe your specific maintenance request or issue, and I will guide you through prerequisites, downtime verification, and ticket drafting!*"
         )
         return {"response_text": response_text}
 
     # 4. If grievance report is complete and draft is prepared
-    if is_complete and draft_data:
+    if draft_data:
         title = draft_data.get("title", "Support Request")
         cat = draft_data.get("category_name", "General Support")
         prio = draft_data.get("priority", "medium").upper()
+        activity = draft_data.get("activity_code", "UNKNOWN")
+        restricted = draft_data.get("restricted_operation", False)
+        manager_review = draft_data.get("requires_manager_review", False)
         
+        response_text = f"✅ **Operational Ticket Draft Prepared:**\n\n"
+        response_text += f"- **Title:** {title}\n- **Activity / Category:** {cat} (`{activity}`)\n- **Priority:** `{prio}`\n\n"
+        
+        if manager_review and activity in ["SERVER", "DATABASE", "NETWORK", "SECURITY", "OTHER_TECHNICAL"]:
+            response_text = "This request is outside standard application support and will be routed to the specialized infrastructure team for Manager Review.\n\n" + response_text
+        elif restricted:
+            response_text = "This is a restricted operational maintenance activity. Please verify the prerequisites and downtime acknowledgment on the draft card below to submit it for Administrator Approval.\n\n" + response_text
+        else:
+            response_text += "Please review the draft card below, verify prerequisites, and click **Approve & Create Ticket** to send this to the support queue."
+
+        return {"response_text": response_text}
+
+    # 5. Targeted Maintenance Operational Diagnostic (No apologies, direct prerequisite & downtime check)
+    from app.core.activity_registry import get_activity
+    act_code = state.get("activity_code", intent)
+    act_def = get_activity(act_code)
+
+    if act_def and act_def.prerequisites:
+        prereq_items = "\n".join([f"- {p}" for p in act_def.prerequisites])
+        downtime_info = act_def.downtime_description
         response_text = (
-            f"✅ **I have analyzed your issue and prepared an official support ticket draft:**\n\n"
-            f"- **Title:** {title}\n"
-            f"- **Category:** {cat}\n"
-            f"- **Priority:** `{prio}`\n\n"
-            f"Please review the draft card below and click **Approve & Create Ticket** to submit it to our support engineering queue."
+            f"### 🛠️ **{act_def.activity_name} — Prerequisites & Downtime Verification**\n\n"
+            f"**Execution Mode:** `{act_def.execution_mode}` | **Downtime Requirement:** `{downtime_info}`\n\n"
+            f"**Mandatory Prerequisites Checklist:**\n"
+            f"{prereq_items}\n\n"
+            f"**Action Required:**\n"
+            f"1. **Prerequisites Status:** Have all of the above prerequisites been completed and verified? *(If any prerequisite is pending, please complete it before proceeding.)*\n"
+            f"2. **Downtime / Maintenance Window:** Please specify your approved maintenance window (date/time) for this operation."
         )
         return {"response_text": response_text}
 
-    # 5. Otherwise, generate targeted diagnostic follow-up questions
+    # 6. Standard Diagnostic Questions for general issues
     if settings.LLM_PROVIDER != "mock":
         prompt_content = (
             f"{DIAGNOSTIC_QUESTION_PROMPT}\n\n"
             f"User Message: {last_user_msg}\n"
             f"Extracted info so far: {json.dumps(extracted)}\n"
             f"Missing Details needed: {', '.join(missing)}\n\n"
-            f"Helpful Diagnostic Response in Markdown:"
+            f"Helpful Diagnostic Response in Markdown (DO NOT APOLOGIZE):"
         )
         llm_reply = await call_ollama(prompt_content)
         if llm_reply:
@@ -108,10 +146,10 @@ async def generate_response_node(state: AgentState) -> Dict[str, Any]:
     # Rule-based diagnostic fallback
     issue_topic = extracted.get("category") or "your issue"
     response_text = (
-        f"I understand you're experiencing trouble with **{issue_topic}**. To help me accurately diagnose and triage this ticket, could you please clarify:\n\n"
-        f"1. **Device / Environment:** What device model or operating system/application are you using?\n"
-        f"2. **Impact & Urgency:** Is this completely blocking your daily work or intermittent?\n"
-        f"3. **Troubleshooting:** Have you tried any quick steps yet (e.g. restarting, reconnecting cables/router)?"
+        f"Regarding **{issue_topic}**, please provide the following operational details:\n\n"
+        f"1. **Environment:** What application version or client environment is affected?\n"
+        f"2. **Impact:** Is this completely blocking or scheduled maintenance?\n"
+        f"3. **Steps Taken:** What specific actions or error codes were encountered?"
     )
     return {"response_text": response_text}
 

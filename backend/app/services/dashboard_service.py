@@ -18,16 +18,29 @@ class DashboardService:
 
     async def get_stats(self, user: User) -> DashboardStats:
         user_roles = [r.name.lower() for r in user.roles]
-        filter_user = "admin" not in user_roles and "manager" not in user_roles and "agent" not in user_roles
+        
+        is_user = "user" in user_roles and not any(r in user_roles for r in ["agent", "manager", "admin"])
+        is_agent = "agent" in user_roles
+        is_manager = "manager" in user_roles
+        is_admin = "admin" in user_roles
 
         base_stmt = select(Ticket)
-        if filter_user:
-            base_stmt = base_stmt.where(Ticket.created_by_id == user.id)
+        
+        # Determine filter
+        def apply_role_filter(stmt):
+            if is_admin:
+                return stmt
+            if is_manager:
+                return stmt
+            if is_agent:
+                from sqlalchemy import or_
+                return stmt.where(or_(Ticket.assigned_to_id == user.id, Ticket.assigned_to_id == None))
+            # if only user
+            return stmt.where(Ticket.created_by_id == user.id)
 
         # 1. Total counts by status
         status_stmt = select(Ticket.status, func.count(Ticket.id)).group_by(Ticket.status)
-        if filter_user:
-            status_stmt = status_stmt.where(Ticket.created_by_id == user.id)
+        status_stmt = apply_role_filter(status_stmt)
         
         status_res = await self.db.execute(status_stmt)
         status_counts = dict(status_res.all())
@@ -39,11 +52,12 @@ class DashboardService:
         resolved_c = status_counts.get("resolved", 0)
         closed_c = status_counts.get("closed", 0)
         escalated_c = status_counts.get("escalated", 0)
+        pending_routing_c = status_counts.get("pending_manager_routing", 0)
+        pending_approval_c = status_counts.get("pending_admin_approval", 0)
 
         # 2. Priority breakdown
         prio_stmt = select(Ticket.priority, func.count(Ticket.id)).group_by(Ticket.priority)
-        if filter_user:
-            prio_stmt = prio_stmt.where(Ticket.created_by_id == user.id)
+        prio_stmt = apply_role_filter(prio_stmt)
         prio_res = await self.db.execute(prio_stmt)
         priority_distribution = [PriorityMetric(priority=p, count=c) for p, c in prio_res.all()]
 
@@ -53,8 +67,7 @@ class DashboardService:
             .join(Ticket, Ticket.category_id == TicketCategory.id)
             .group_by(TicketCategory.name)
         )
-        if filter_user:
-            cat_stmt = cat_stmt.where(Ticket.created_by_id == user.id)
+        cat_stmt = apply_role_filter(cat_stmt)
         cat_res = await self.db.execute(cat_stmt)
         category_distribution = [CategoryMetric(category_name=name, count=c) for name, c in cat_res.all()]
 
@@ -69,8 +82,7 @@ class DashboardService:
             .order_by(desc(Ticket.created_at))
             .limit(10)
         )
-        if filter_user:
-            recent_stmt = recent_stmt.where(Ticket.created_by_id == user.id)
+        recent_stmt = apply_role_filter(recent_stmt)
         recent_res = await self.db.execute(recent_stmt)
         recent_models = recent_res.scalars().all()
 
@@ -86,6 +98,9 @@ class DashboardService:
                 assignee_name=t.assignee.full_name if t.assignee else None,
                 created_at=t.created_at,
                 updated_at=t.updated_at,
+                activity_code=t.activity_code,
+                operation_status=t.operation_status,
+                requires_admin_approval=t.requires_admin_approval,
             )
             for t in recent_models
         ]
@@ -98,6 +113,8 @@ class DashboardService:
             resolved_tickets=resolved_c,
             closed_tickets=closed_c,
             escalated_tickets=escalated_c,
+            pending_routing_tickets=pending_routing_c,
+            pending_approval_tickets=pending_approval_c,
             priority_distribution=priority_distribution,
             category_distribution=category_distribution,
             recent_tickets=recent_summaries,

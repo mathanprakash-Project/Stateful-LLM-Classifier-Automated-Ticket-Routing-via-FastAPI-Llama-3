@@ -25,5 +25,8 @@ def test_admin_role_permissions():
 
 def test_has_permission_helper():
     assert has_permission([UserRole.MANAGER.value], PermissionCode.TICKET_ASSIGN.value) is True
+    assert has_permission([UserRole.MANAGER.value], PermissionCode.TICKET_DELETE.value) is True
     assert has_permission([UserRole.USER.value], PermissionCode.TICKET_ASSIGN.value) is False
+    assert has_permission([UserRole.USER.value], PermissionCode.TICKET_DELETE.value) is False
+    assert has_permission([UserRole.AGENT.value], PermissionCode.TICKET_DELETE.value) is False
 

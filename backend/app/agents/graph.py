@@ -16,10 +16,13 @@ from app.agents.state import AgentState
 
 
 def route_by_intent(state: AgentState) -> Literal["extract_info", "generate_response"]:
-    intent = state.get("intent", "grievance_report")
-    if intent in ("grievance_report", "draft_modification"):
-        return "extract_info"
-    return "generate_response"
+    intent = state.get("intent", "APPLICATION_OTHER")
+    # Intents that go directly to response generation (no ticket extraction needed)
+    skip_extraction_intents = {"NON_TECHNICAL", "out_of_scope", "ticket_status", "general_query"}
+    if intent in skip_extraction_intents:
+        return "generate_response"
+    # All ticket-eligible intents (APPLICATION_UI, APPLICATION_VERSION, etc.) need extraction
+    return "extract_info"
 
 
 def route_completeness(state: AgentState) -> Literal["generate_draft", "generate_response"]:
@@ -84,6 +87,7 @@ async def run_chat_turn(
         "current_user_message": user_message,
         "messages": existing_messages,
         "intent": current_state.get("intent"),
+        "activity_code": current_state.get("activity_code"),
         "extracted_fields": current_state.get("extracted_fields", {}),
         "missing_fields": current_state.get("missing_fields", []),
         "draft": current_state.get("draft"),

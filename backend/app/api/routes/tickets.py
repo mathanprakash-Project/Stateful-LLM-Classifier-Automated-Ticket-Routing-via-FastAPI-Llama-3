@@ -6,7 +6,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.dependencies import get_current_user, get_db
+from app.api.dependencies import get_current_user, get_db, require_role
 from app.models import User
 from app.schemas.common import PaginatedResponse
 from app.schemas.ticket import (
@@ -113,4 +113,98 @@ async def add_comment(
         content=comment_in.content,
         is_internal=comment_in.is_internal,
     )
+
+
+@router.post("/{ticket_id}/approve", response_model=TicketResponse)
+async def approve_operation(
+    ticket_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    ticket_service = TicketService(db)
+    return await ticket_service.approve_restricted_operation(ticket_id, current_user, db)
+
+
+@router.post("/{ticket_id}/reject", response_model=TicketResponse)
+async def reject_operation(
+    ticket_id: str,
+    body: dict,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    ticket_service = TicketService(db)
+    reason = body.get("reason", "No reason provided")
+    return await ticket_service.reject_restricted_operation(ticket_id, current_user, reason, db)
+
+
+@router.post("/{ticket_id}/execute", response_model=TicketResponse)
+async def execute_operation(
+    ticket_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    ticket_service = TicketService(db)
+    return await ticket_service.execute_restricted_operation(ticket_id, current_user, db)
+
+
+@router.post("/{ticket_id}/assign", response_model=TicketResponse)
+async def assign_ticket_endpoint(
+    ticket_id: str,
+    body: dict,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    agent_id = body.get("agent_id")
+    if not agent_id:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="agent_id is required")
+    ticket_service = TicketService(db)
+    return await ticket_service.assign_to_agent(ticket_id, current_user, agent_id, db)
+
+
+@router.post("/{ticket_id}/start-work", response_model=TicketResponse)
+async def start_work_endpoint(
+    ticket_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    ticket_service = TicketService(db)
+    return await ticket_service.start_work(ticket_id, current_user, db)
+
+
+@router.post("/{ticket_id}/complete-work", response_model=TicketResponse)
+async def complete_work_endpoint(
+    ticket_id: str,
+    body: dict,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    notes = body.get("notes", "Activity completed successfully.")
+    ticket_service = TicketService(db)
+    return await ticket_service.complete_work(ticket_id, current_user, notes, db)
+
+
+@router.post("/{ticket_id}/route", response_model=TicketResponse)
+async def route_ticket_endpoint(
+    ticket_id: str,
+    body: dict,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    ticket_service = TicketService(db)
+    target_team = body.get("target_team")
+    if not target_team:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="target_team is required")
+    return await ticket_service.route_ticket(ticket_id, current_user, target_team, db)
+
+
+@router.delete("/{ticket_id}", status_code=status.HTTP_200_OK)
+async def delete_ticket_endpoint(
+    ticket_id: str,
+    current_user: User = Depends(require_role("manager")),
+    db: AsyncSession = Depends(get_db),
+):
+    ticket_service = TicketService(db)
+    return await ticket_service.delete_ticket(ticket_id, current_user)
 

@@ -22,79 +22,85 @@ def is_text_out_of_scope(text: str) -> bool:
     return any(re.search(rf"\b{re.escape(kw)}\b", lower) for kw in OUT_OF_SCOPE_KEYWORDS)
 
 
-def rule_based_extraction_fallback(text: str, current_fields: Dict[str, Any]) -> Dict[str, Any]:
+def rule_based_extraction_fallback(text: str, current_fields: Dict[str, Any], history: list = None) -> Dict[str, Any]:
     extracted = dict(current_fields or {})
     lower = text.lower()
+    full_text = text
+    if history:
+        full_text = " ".join([m.get("content", "") for m in history if m.get("role") == "user"]) + " " + text
+    full_lower = full_text.lower()
 
     # If the user input is out-of-scope noise, do NOT pollute technical fields
     if is_text_out_of_scope(text) and not any(w in lower for w in ["wifi", "airfiber", "vpn", "laptop", "pc", "network", "internet"]):
         return extracted
 
-    # Category heuristic
-    if any(w in lower for w in ["vpn", "wifi", "wi-fi", "internet", "dns", "network", "connect", "airfiber", "fiber", "router", "mbps", "bandwidth"]):
+    # Category heuristic based on full conversation
+    if any(w in full_lower for w in ["button", "layout", "page", "validation", "ui", "missing field"]):
+        extracted["category"] = "Application UI"
+        if "bug" in full_lower or "error" in full_lower:
+            extracted["subcategory"] = "UI Bug"
+        else:
+            extracted["subcategory"] = "Enhancement Request"
+    elif any(w in full_lower for w in ["upgrade", "downgrade", "version", "patch", "migrate version", "application versioning"]):
+        extracted["category"] = "Application Version Maintenance"
+        extracted["subcategory"] = "Version Upgrade"
+    elif any(w in full_lower for w in ["transfer data", "client", "migrate client", "copy client", "client-to-client", "data transfer"]):
+        extracted["category"] = "Client Data Transfer"
+        extracted["subcategory"] = "Data Migration"
+    elif any(w in full_lower for w in ["file", "upload", "download", "replace", "interface logs"]):
+        extracted["category"] = "File Management"
+        extracted["subcategory"] = "File Upload Issue"
+    elif any(w in full_lower for w in ["server", "cpu", "memory", "deployment"]):
+        extracted["category"] = "Server / Infrastructure"
+        extracted["subcategory"] = "Server Down"
+    elif any(w in full_lower for w in ["database", "db", "sql"]):
+        extracted["category"] = "Database"
+        extracted["subcategory"] = "DB Connection"
+    elif any(w in full_lower for w in ["network", "vpn", "dns", "firewall"]):
         extracted["category"] = "Network"
-        if "vpn" in lower:
-            extracted["subcategory"] = "VPN Connection"
-        elif any(w in lower for w in ["airfiber", "fiber", "broadband", "unstable", "speed", "mbps"]):
-            extracted["subcategory"] = "Slow Internet"
-        elif "wifi" in lower or "wi-fi" in lower:
-            extracted["subcategory"] = "Wi-Fi Connectivity"
-    elif any(w in lower for w in ["laptop", "screen", "monitor", "mouse", "keyboard", "printer", "hardware", "dock", "dell", "macbook", "lenovo"]):
-        extracted["category"] = "Hardware"
-        if "laptop" in lower or "slow" in lower or "fans" in lower:
-            extracted["subcategory"] = "Laptop Issue"
-        elif "monitor" in lower or "screen" in lower or "hdmi" in lower:
-            extracted["subcategory"] = "Monitor / Display"
-    elif any(w in lower for w in ["password", "login", "locked", "mfa", "2fa", "access", "permission"]):
-        extracted["category"] = "Access & Security"
-        if "password" in lower:
-            extracted["subcategory"] = "Password Reset"
-        elif "locked" in lower:
-            extracted["subcategory"] = "Account Locked"
-    elif any(w in lower for w in ["charge", "invoice", "refund", "billing", "payment", "subscription", "dollar", "$"]):
-        extracted["category"] = "Billing & Payments"
-        if "double" in lower or "twice" in lower:
-            extracted["subcategory"] = "Double Charge"
-        elif "refund" in lower:
-            extracted["subcategory"] = "Refund Request"
-    elif any(w in lower for w in ["software", "crash", "install", "app", "error", "bug", "license"]):
-        extracted["category"] = "Software"
-        if "crash" in lower:
-            extracted["subcategory"] = "Application Crash"
-        elif "install" in lower:
-            extracted["subcategory"] = "Software Installation"
+        extracted["subcategory"] = "Connectivity Issue"
+    elif any(w in full_lower for w in ["security", "access violation", "vulnerability"]):
+        extracted["category"] = "Security"
+        extracted["subcategory"] = "Access Violation"
+    elif not extracted.get("category"):
+        extracted["category"] = "Application Support"
+        extracted["subcategory"] = "General Inquiry"
 
     # Priority heuristic
-    if any(w in lower for w in ["urgent", "critical", "outage", "blocker", "emergency"]):
+    if any(w in full_lower for w in ["urgent", "critical", "outage", "blocker", "emergency"]):
         extracted["priority"] = "critical"
-    elif any(w in lower for w in ["high priority", "asap", "can't work", "cannot work", "deadline", "unstable", "completely blocks"]):
+    elif any(w in full_lower for w in ["high priority", "asap", "can't work", "cannot work", "deadline", "unstable", "completely blocks"]):
         extracted["priority"] = "high"
-    elif any(w in lower for w in ["low priority", "minor", "whenever"]):
+    elif any(w in full_lower for w in ["low priority", "minor", "whenever"]):
         extracted["priority"] = "low"
     elif "priority" not in extracted:
         extracted["priority"] = "medium"
 
     # Metadata heuristics
-    if any(w in lower for w in ["dell", "macbook", "lenovo", "thinkpad", "windows", "macos", "linux", "airfiber", "airtel", "router"]):
+    if any(w in full_lower for w in ["dell", "macbook", "lenovo", "thinkpad", "windows", "macos", "linux", "airfiber", "airtel", "router"]):
         extracted["affected_system"] = text.strip()
-    if any(w in lower for w in ["tried", "reboot", "restarting", "cable", "reset", "attempted", "reconnected", "hdmi"]):
+    if any(w in full_lower for w in ["tried", "reboot", "restarting", "cable", "reset", "attempted", "reconnected", "hdmi"]):
         extracted["troubleshooting_tried"] = text.strip()
 
-    # Title formulation (clean technical summary)
-    if "airfiber" in lower or "airtel" in lower:
-        extracted["title"] = "Airtel AirFiber Unstable Connection"
-    elif not extracted.get("title") or is_text_out_of_scope(extracted.get("title", "")):
-        extracted["title"] = text[:60].strip().capitalize()
-        if len(text) > 60:
-            extracted["title"] += "..."
+    # Title formulation
+    if not extracted.get("title") or is_text_out_of_scope(extracted.get("title", "")):
+        if "version" in full_lower or "upgrade" in full_lower:
+            extracted["title"] = "Application Version Upgrade Maintenance"
+        elif "transfer" in full_lower or "client" in full_lower:
+            extracted["title"] = "Client Data Transfer Request"
+        elif "airfiber" in full_lower or "airtel" in full_lower:
+            extracted["title"] = "Airtel AirFiber Unstable Connection"
+        else:
+            extracted["title"] = full_text[:60].strip().capitalize()
+            if len(full_text) > 60:
+                extracted["title"] += "..."
     
     # Description formulation
     if not extracted.get("description") or is_text_out_of_scope(extracted.get("description", "")):
-        extracted["description"] = text.strip()
+        extracted["description"] = full_text.strip()
     else:
-        # Append additional technical info if not already included
         if text.strip() not in extracted["description"] and not is_text_out_of_scope(text):
-            extracted["description"] = f"{extracted['description']}\nAdditional details: {text.strip()}"
+            extracted["description"] = f"{extracted['description']}\nSchedule / Notes: {text.strip()}"
 
     return extracted
 
@@ -132,5 +138,5 @@ async def extract_info_node(state: AgentState) -> Dict[str, Any]:
             except Exception as exc:
                 logger.warning("LLM info extraction json parse fallback: %s", exc)
 
-    extracted = rule_based_extraction_fallback(user_msg, current_fields)
+    extracted = rule_based_extraction_fallback(user_msg, current_fields, clean_history)
     return {"extracted_fields": extracted}

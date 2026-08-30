@@ -21,14 +21,30 @@ class Ticket(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
-    priority: Mapped[str] = mapped_column(String(20), default="medium", nullable=False, index=True)
-    status: Mapped[str] = mapped_column(String(20), default="open", nullable=False, index=True)
+    priority: Mapped[str] = mapped_column(String(30), default="medium", nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(50), default="open", nullable=False, index=True)
     meta_info: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
     idempotency_key: Mapped[Optional[str]] = mapped_column(String(64), unique=True, nullable=True, index=True)
     version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
 
     resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     closed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    activity_code: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, index=True)
+    technical_scope: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    operation_status: Mapped[Optional[str]] = mapped_column(String(30), default="not_applicable", nullable=True)
+    responsible_team: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    requires_admin_approval: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    routed_to_team: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    routed_by_id: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("users.id"), nullable=True)
+    routed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # Operational Maintenance & Governance
+    execution_mode: Mapped[Optional[str]] = mapped_column(String(30), default="Online", nullable=True)
+    downtime_required: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    downtime_acknowledged: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    prerequisites_confirmed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    prerequisites_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # Relationships
     creator: Mapped["User"] = relationship(
@@ -37,6 +53,7 @@ class Ticket(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         back_populates="tickets_created",
         lazy="selectin",
     )
+    routed_by = relationship("User", foreign_keys=[routed_by_id])
     assignee: Mapped[Optional["User"]] = relationship(
         "User",
         foreign_keys=[assigned_to_id],

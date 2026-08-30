@@ -36,6 +36,7 @@ ROLE_PERMISSIONS: dict[UserRole, Set[PermissionCode]] = {
         PermissionCode.TICKET_ASSIGN,
         PermissionCode.TICKET_ESCALATE,
         PermissionCode.TICKET_REOPEN,
+        PermissionCode.TICKET_DELETE,
         PermissionCode.DASHBOARD_ANALYTICS,
     },
     UserRole.ADMIN: {
@@ -51,6 +52,7 @@ ROLE_PERMISSIONS: dict[UserRole, Set[PermissionCode]] = {
         PermissionCode.TICKET_ESCALATE,
         PermissionCode.TICKET_CLOSE_OWN,
         PermissionCode.TICKET_REOPEN,
+        PermissionCode.TICKET_DELETE,
         PermissionCode.CHAT_CREATE,
         PermissionCode.CHAT_READ_OWN,
         PermissionCode.USER_MANAGE,

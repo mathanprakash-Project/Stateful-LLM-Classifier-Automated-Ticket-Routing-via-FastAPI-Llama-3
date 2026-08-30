@@ -68,9 +68,21 @@ class ChatRepository:
         return msg
 
     async def update_session_state(self, session_id: str, agent_state: dict[str, Any]):
+        from sqlalchemy.orm.attributes import flag_modified
         session = await self.get_session(session_id)
         if session:
-            session.agent_state = agent_state
+            clean_state = {
+                "intent": agent_state.get("intent"),
+                "activity_code": agent_state.get("activity_code"),
+                "extracted_fields": agent_state.get("extracted_fields", {}),
+                "missing_fields": agent_state.get("missing_fields", []),
+                "draft": agent_state.get("draft"),
+                "draft_id": agent_state.get("draft_id"),
+                "draft_status": agent_state.get("draft_status"),
+                "needs_human_approval": agent_state.get("needs_human_approval", False),
+            }
+            session.agent_state = clean_state
+            flag_modified(session, "agent_state")
             await self.db.commit()
 
     async def create_draft(

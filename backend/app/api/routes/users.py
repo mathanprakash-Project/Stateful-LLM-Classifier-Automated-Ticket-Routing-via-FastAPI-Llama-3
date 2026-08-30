@@ -31,3 +31,23 @@ async def list_users(
         for u in users
     ]
 
+
+@router.get("/agents")
+async def list_agents(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    repo = UserRepository(db)
+    users = await repo.list_users(limit=100)
+    agents = []
+    for u in users:
+        role_names = [r.name.lower() for r in u.roles]
+        if "agent" in role_names or "admin" in role_names or "manager" in role_names:
+            agents.append({
+                "id": u.id,
+                "email": u.email,
+                "name": f"{u.full_name} ({', '.join(r.upper() for r in role_names)})",
+                "roles": role_names,
+            })
+    return agents
+

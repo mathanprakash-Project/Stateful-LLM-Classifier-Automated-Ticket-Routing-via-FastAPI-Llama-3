@@ -128,6 +128,17 @@ class TicketRepository:
         subcategory_id: Optional[str] = None,
         meta_info: Optional[dict[str, Any]] = None,
         idempotency_key: Optional[str] = None,
+        activity_code: Optional[str] = None,
+        technical_scope: Optional[str] = None,
+        operation_status: str = "not_applicable",
+        responsible_team: Optional[str] = None,
+        requires_admin_approval: bool = False,
+        status: str = "open",
+        execution_mode: Optional[str] = "Online",
+        downtime_required: bool = False,
+        downtime_acknowledged: bool = False,
+        prerequisites_confirmed: bool = False,
+        prerequisites_notes: Optional[str] = None,
     ) -> Ticket:
         ticket = Ticket(
             ticket_number=ticket_number,
@@ -137,9 +148,19 @@ class TicketRepository:
             title=title,
             description=description,
             priority=priority.lower(),
-            status="open",
+            status=status,
             meta_info=meta_info or {},
             idempotency_key=idempotency_key,
+            activity_code=activity_code,
+            technical_scope=technical_scope,
+            operation_status=operation_status,
+            responsible_team=responsible_team,
+            requires_admin_approval=requires_admin_approval,
+            execution_mode=execution_mode,
+            downtime_required=downtime_required,
+            downtime_acknowledged=downtime_acknowledged,
+            prerequisites_confirmed=prerequisites_confirmed,
+            prerequisites_notes=prerequisites_notes,
             version=1,
         )
         self.db.add(ticket)
@@ -151,7 +172,7 @@ class TicketRepository:
             changed_by_id=created_by_id,
             field_name="status",
             old_value=None,
-            new_value="open",
+            new_value=status,
             change_reason="Ticket created",
         )
         self.db.add(history)
@@ -193,4 +214,13 @@ class TicketRepository:
         self.db.add(history)
         await self.db.flush()
         return history
+
+    async def delete(self, ticket: Ticket) -> None:
+        from sqlalchemy import update
+        from app.models.chat import AITicketDraft
+        await self.db.execute(
+            update(AITicketDraft).where(AITicketDraft.ticket_id == ticket.id).values(ticket_id=None)
+        )
+        await self.db.delete(ticket)
+        await self.db.commit()
 

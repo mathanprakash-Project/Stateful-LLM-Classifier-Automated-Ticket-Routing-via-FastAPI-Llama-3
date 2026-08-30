@@ -24,6 +24,28 @@ ALLOWED_TRANSITIONS: Dict[Tuple[str, str], Set[str]] = {
     ("resolved", "closed"): {UserRole.USER.value, UserRole.AGENT.value, UserRole.MANAGER.value, UserRole.ADMIN.value},
     ("resolved", "reopened"): {UserRole.USER.value, UserRole.MANAGER.value, UserRole.ADMIN.value},
     ("closed", "reopened"): {UserRole.USER.value, UserRole.MANAGER.value, UserRole.ADMIN.value},
+    # Manager routing flow
+    ("open", "pending_manager_routing"): {"agent", "manager", "admin"},
+    ("pending_manager_routing", "routed"): {"manager", "admin"},
+    ("pending_manager_routing", "assigned"): {"agent", "manager", "admin"},
+    ("pending_manager_routing", "open"): {"manager", "admin"},
+    ("pending_manager_routing", "rejected"): {"manager", "admin"},
+    ("pending_manager_routing", "cancelled"): {"manager", "admin"},
+    ("routed", "in_progress"): {"agent", "manager", "admin"},
+    ("routed", "resolved"): {"agent", "manager", "admin"},
+    ("routed", "cancelled"): {"manager", "admin"},
+    # Admin approval flow (restricted operations)
+    ("open", "pending_admin_approval"): {"agent", "manager", "admin"},
+    ("pending_admin_approval", "approved"): {"admin"},
+    ("pending_admin_approval", "rejected"): {"admin"},
+    ("pending_admin_approval", "cancelled"): {"admin"},
+    ("pending_admin_approval", "open"): {"admin"},
+    ("approved", "assigned"): {"admin", "manager"},
+    ("approved", "in_progress"): {"agent", "admin"},
+    ("approved", "resolved"): {"agent", "admin"},
+    # Rejected tickets
+    ("rejected", "closed"): {"manager", "admin"},
+    ("rejected", "reopened"): {"manager", "admin"},
 }
 
 
