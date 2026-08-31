@@ -18,9 +18,16 @@ export class AuthService {
   user = this._user.asReadonly();
   isAuthenticated = computed(() => !!this._token());
   userRole = computed(() => (this._user()?.roles?.[0] ?? 'user').toLowerCase());
+  isUser = computed(() => this.userRole() === 'user');
   isAdmin = computed(() => this.userRole() === 'admin');
   isManager = computed(() => this.userRole() === 'manager' || this.userRole() === 'admin');
-  isAgent = computed(() => this.userRole() === 'agent' || this.userRole() === 'manager' || this.userRole() === 'admin');
+  isAgent = computed(() => this.userRole() === 'agent' || this.userRole() === 'employee' || this.userRole() === 'manager' || this.userRole() === 'admin');
+  isEmployee = computed(() => this.userRole() === 'agent' || this.userRole() === 'employee');
+  roleDisplayName = computed(() => {
+    const r = this.userRole();
+    if (r === 'agent' || r === 'employee') return 'EMPLOYEE';
+    return r.toUpperCase();
+  });
 
   constructor(private router: Router) {
     if (this._token()) {

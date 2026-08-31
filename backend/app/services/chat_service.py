@@ -58,6 +58,7 @@ class ChatService:
         logger.info("[CHAT_TURN_START] session_id=%s, current_state=%s, user_msg=%s", session.id, session.agent_state, message_text)
 
         # 3. Run agent turn
+        primary_role = user.roles[0].name.lower() if user.roles else "user"
         agent_res = await run_chat_turn(
             session_id=session.id,
             user_id=user.id,
@@ -65,6 +66,7 @@ class ChatService:
             user_message=message_text,
             existing_messages=existing_msgs,
             current_state=session.agent_state or {},
+            user_role=primary_role,
         )
 
         logger.info("[CHAT_TURN_END] agent_res intent=%s, act=%s, missing=%s, draft=%s", agent_res.get("intent"), agent_res.get("activity_code"), agent_res.get("missing_fields"), bool(agent_res.get("draft")))

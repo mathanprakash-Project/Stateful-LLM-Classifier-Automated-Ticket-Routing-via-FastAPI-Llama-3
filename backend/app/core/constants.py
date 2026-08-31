@@ -27,6 +27,7 @@ class TicketStatus(str, Enum):
     APPROVED = "approved"
     REJECTED = "rejected"
     ROUTED = "routed"
+    ARCHIVED = "archived"
 
 
 class ActivityCode(str, Enum):

@@ -31,6 +31,11 @@ class TicketService:
         self.audit_repo = AuditRepository(db)
 
     async def create_ticket(self, user: User, data: TicketCreate) -> Ticket:
+        # Check permissions: only requester user profile can create tickets
+        user_roles = [r.name.lower() for r in user.roles] if user.roles else ["user"]
+        if "user" not in user_roles:
+            raise AuthorizationError("Only requester user profile is authorized to create tickets.")
+
         # Check idempotency key
         if data.idempotency_key:
             existing = await self.ticket_repo.get_by_idempotency_key(data.idempotency_key)
@@ -187,6 +192,14 @@ class TicketService:
             elif target_status == "closed":
                 ticket.closed_at = now
             elif target_status == "reopened":
+                meta = dict(ticket.meta_info or {})
+                current_reopens = meta.get("reopen_count", 0)
+                if current_reopens >= 2:
+                    raise ValidationError(
+                        "This ticket has already reached the maximum limit of 2 reopens and cannot be reopened further."
+                    )
+                meta["reopen_count"] = current_reopens + 1
+                ticket.meta_info = meta
                 ticket.resolved_at = None
                 ticket.closed_at = None
 
@@ -446,7 +459,24 @@ class TicketService:
 
         await self.ticket_repo.record_history(ticket.id, agent_user.id, "status", old_status, "resolved", "Agent completed work and resolved ticket")
         await session.commit()
-        await notification_service.broadcast("ticket_updated", {"ticket_id": ticket.id})
+        await notification_service.broadcast(
+            "ticket_resolved",
+            {
+                "ticket_id": ticket.id,
+                "ticket_number": ticket.ticket_number,
+                "title": ticket.title,
+                "status": "resolved",
+            }
+        )
+        await notification_service.broadcast(
+            "ticket_updated",
+            {
+                "ticket_id": ticket.id,
+                "ticket_number": ticket.ticket_number,
+                "title": ticket.title,
+                "status": "resolved",
+            }
+        )
         return ticket
 
     async def delete_ticket(self, ticket_id: str, user: User) -> dict:
@@ -480,4 +510,81 @@ class TicketService:
         await self.ticket_repo.delete(ticket)
         await notification_service.broadcast("ticket_deleted", {"ticket_id": ticket_id, "ticket_number": ticket_number})
         return {"message": f"Ticket {ticket_number} deleted successfully", "id": ticket_id}
+
+    async def archive_ticket(self, ticket_id: str, user: User, session: AsyncSession) -> Ticket:
+        ticket = await self._get_ticket_for_update(ticket_id, user, session)
+        user_roles = [r.name.lower() for r in user.roles]
+        validate_transition(ticket.status, "archived", user_roles)
+
+        old_status = ticket.status
+        ticket.status = "archived"
+        ticket.version += 1
+
+        await self.ticket_repo.record_history(ticket.id, user.id, "status", old_status, "archived", "Ticket moved to 2-month archive retention")
+        await session.commit()
+        await notification_service.broadcast("ticket_updated", {"ticket_id": ticket.id, "status": "archived"})
+        return ticket
+
+    async def renew_ticket(self, ticket_id: str, user: User, session: AsyncSession) -> Ticket:
+        ticket = await self._get_ticket_for_update(ticket_id, user, session)
+        user_roles = [r.name.lower() for r in user.roles]
+        
+        # Validate that requester user owns ticket or staff
+        if "user" in user_roles and "admin" not in user_roles and "manager" not in user_roles and "agent" not in user_roles:
+            if ticket.creator_id != user.id:
+                raise AuthorizationError("You can only renew and reopen your own archived tickets.")
+
+        validate_transition(ticket.status, "reopened", user_roles)
+
+        old_status = ticket.status
+        ticket.status = "reopened"
+        ticket.version += 1
+
+        await self.ticket_repo.record_history(ticket.id, user.id, "status", old_status, "reopened", "Archived ticket renewed and reopened into active queue")
+        await session.commit()
+        await notification_service.broadcast("ticket_updated", {"ticket_id": ticket.id, "status": "reopened"})
+        return ticket
+
+    async def reopen_ticket(self, ticket_id: str, user: User, session: AsyncSession) -> Ticket:
+        ticket = await self._get_ticket_for_update(ticket_id, user, session)
+        user_roles = [r.name.lower() for r in user.roles]
+        
+        validate_transition(ticket.status, "reopened", user_roles)
+        
+        meta = dict(ticket.meta_info or {})
+        reopen_count = meta.get("reopen_count", 0)
+        if reopen_count >= 2:
+            raise ValidationError(
+                "This ticket has already reached the maximum limit of 2 reopens and cannot be reopened further."
+            )
+        
+        old_status = ticket.status
+        ticket.status = "reopened"
+        ticket.resolved_at = None
+        ticket.closed_at = None
+        meta["reopen_count"] = reopen_count + 1
+        ticket.meta_info = meta
+        ticket.version += 1
+        
+        await self.ticket_repo.record_history(
+            ticket.id,
+            user.id,
+            "status",
+            old_status,
+            "reopened",
+            f"Ticket reopened (Reopen attempt {meta['reopen_count']} of 2)"
+        )
+        await session.commit()
+        await notification_service.broadcast(
+            "ticket_updated",
+            {
+                "ticket_id": ticket.id,
+                "ticket_number": ticket.ticket_number,
+                "title": ticket.title,
+                "status": "reopened",
+                "reopen_count": meta["reopen_count"]
+            }
+        )
+        return ticket
+
 

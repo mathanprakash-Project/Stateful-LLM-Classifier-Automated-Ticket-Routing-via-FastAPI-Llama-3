@@ -208,3 +208,34 @@ async def delete_ticket_endpoint(
     ticket_service = TicketService(db)
     return await ticket_service.delete_ticket(ticket_id, current_user)
 
+
+@router.post("/{ticket_id}/archive", response_model=TicketResponse)
+async def archive_ticket_endpoint(
+    ticket_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    ticket_service = TicketService(db)
+    return await ticket_service.archive_ticket(ticket_id, current_user, db)
+
+
+@router.post("/{ticket_id}/renew", response_model=TicketResponse)
+async def renew_ticket_endpoint(
+    ticket_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    ticket_service = TicketService(db)
+    return await ticket_service.renew_ticket(ticket_id, current_user, db)
+
+
+@router.post("/{ticket_id}/reopen", response_model=TicketResponse)
+async def reopen_ticket_endpoint(
+    ticket_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    ticket_service = TicketService(db)
+    return await ticket_service.reopen_ticket(ticket_id, current_user, db)
+
+

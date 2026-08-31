@@ -39,6 +39,54 @@ async def generate_response_node(state: AgentState) -> Dict[str, Any]:
                 last_user_msg = m.get("content", "")
                 break
 
+    user_role = (state.get("user_role") or "user").lower()
+
+    # 0. Staff Technical Advisor Mode (Employee / Manager / Admin)
+    # Staff can chat with the assistant regarding doubts and questions on how to perform activities (zero ticket drafting).
+    if user_role != "user":
+        if settings.LLM_PROVIDER != "mock":
+            staff_prompt = (
+                f"You are an Enterprise Operational & Technical Advisor assisting internal IT staff (Role: {user_role.upper()}).\n\n"
+                "CRITICAL SYSTEM POLICIES:\n"
+                "1. In this system, ONLY requester User profiles create tickets. Internal staff (Employees, Managers, Admins) do NOT create tickets.\n"
+                "2. The staff member is asking technical questions, doubts, or operational guidelines on how activities work or how to perform them.\n"
+                "3. NEVER provide instructions or steps for Admins, Managers, or Employees to create or submit a ticket.\n"
+                "4. Directly explain the technical and operational activity (purpose, execution mode, prerequisites, downtime impact, verification steps, and how employees execute it).\n"
+                "5. If the query mentions ticket creation, clarify simply: 'In our system, tickets are created exclusively by customer User profiles. As staff, our role is to review, execute, and resolve these activities.' Then directly explain how the activity is performed.\n"
+                "6. Keep your explanation direct, professional, and well-structured in markdown with bullet points.\n\n"
+                f"Staff Member Query: {last_user_msg}\n\n"
+                "Technical Advisor Response in Markdown:"
+            )
+            llm_reply = await call_ollama(staff_prompt)
+            if llm_reply:
+                return {"response_text": llm_reply}
+
+        # Fallback technical guidance if LLM is in mock mode or offline
+        from app.core.activity_registry import get_activity
+        act_code = state.get("activity_code", intent)
+        act_def = get_activity(act_code)
+        if act_def:
+            prereq_items = "\n".join([f"- {p}" for p in act_def.prerequisites]) if act_def.prerequisites else "- Standard system health check"
+            return {
+                "response_text": (
+                    f"### 🛠️ **Technical Execution Advisory: {act_def.activity_name}** (`{act_def.activity_code}`)\n\n"
+                    f"**Execution Mode:** `{act_def.execution_mode}` | **Downtime Requirement:** `{act_def.downtime_description}`\n\n"
+                    f"**Summary & Impact:**\n{act_def.customer_impact_summary}\n\n"
+                    f"**Prerequisites & Verification Checklist:**\n{prereq_items}\n\n"
+                    f"**Execution Guidelines for Employees & Staff:**\n"
+                    f"1. **Pre-flight Checks:** Validate database locks, system backup snapshots, and staging verifications.\n"
+                    f"2. **Maintenance Execution:** Apply executable binaries, run migration scripts, and clear system caches.\n"
+                    f"3. **Post-execution Health:** Verify application endpoints and update the ticket status with operational completion notes."
+                )
+            }
+        return {
+            "response_text": (
+                "👋 **Employee & Staff Operational Advisor**\n\n"
+                "I am here to assist internal staff (Employees, Managers, Admins) with operational guidelines, command procedures, and technical advice for performing activities across our application stack.\n\n"
+                "Feel free to ask any questions or doubts regarding **Application Versioning**, **Client Data Transfer**, **File Housekeeping**, **UI adaptations**, or system maintenance procedures."
+            )
+        }
+
     # 1. Out-of-scope / non-technical topic handler
     if intent in ("out_of_scope", "NON_TECHNICAL"):
         if settings.LLM_PROVIDER != "mock":

@@ -94,6 +94,10 @@ async def test_ticket_status_transition_as_agent(client: AsyncClient):
 async def test_approve_restricted_operation(client: AsyncClient):
     admin_login = await client.post("/auth/login", json={"email": "admin@company.com", "password": "password123"})
     admin_headers = {"Authorization": f"Bearer {admin_login.json()['access_token']}"}
+
+    user_login = await client.post("/auth/login", json={"email": "john@company.com", "password": "password123"})
+    user_headers = {"Authorization": f"Bearer {user_login.json()['access_token']}"}
+
     cats = (await client.get("/categories")).json()
     
     t_resp = await client.post(
@@ -107,7 +111,7 @@ async def test_approve_restricted_operation(client: AsyncClient):
             "operation_status": "pending",
             "activity_code": "CLIENT_DATA_TRANSFER"
         },
-        headers=admin_headers,
+        headers=user_headers,
     )
     ticket_id = t_resp.json()["id"]
     
@@ -124,6 +128,10 @@ async def test_approve_restricted_operation(client: AsyncClient):
 async def test_reject_restricted_operation(client: AsyncClient):
     admin_login = await client.post("/auth/login", json={"email": "admin@company.com", "password": "password123"})
     admin_headers = {"Authorization": f"Bearer {admin_login.json()['access_token']}"}
+
+    user_login = await client.post("/auth/login", json={"email": "john@company.com", "password": "password123"})
+    user_headers = {"Authorization": f"Bearer {user_login.json()['access_token']}"}
+
     cats = (await client.get("/categories")).json()
     
     t_resp = await client.post(
@@ -137,7 +145,7 @@ async def test_reject_restricted_operation(client: AsyncClient):
             "operation_status": "pending",
             "activity_code": "CLIENT_DATA_TRANSFER"
         },
-        headers=admin_headers,
+        headers=user_headers,
     )
     ticket_id = t_resp.json()["id"]
     
@@ -151,6 +159,10 @@ async def test_reject_restricted_operation(client: AsyncClient):
 async def test_route_ticket(client: AsyncClient):
     manager_login = await client.post("/auth/login", json={"email": "alice@company.com", "password": "password123"})
     manager_headers = {"Authorization": f"Bearer {manager_login.json()['access_token']}"}
+
+    user_login = await client.post("/auth/login", json={"email": "john@company.com", "password": "password123"})
+    user_headers = {"Authorization": f"Bearer {user_login.json()['access_token']}"}
+
     cats = (await client.get("/categories")).json()
     
     t_resp = await client.post(
@@ -163,7 +175,7 @@ async def test_route_ticket(client: AsyncClient):
             "responsible_team": "DATABASE",
             "activity_code": "DATABASE"
         },
-        headers=manager_headers,
+        headers=user_headers,
     )
     ticket_id = t_resp.json()["id"]
     # should be pending_manager_routing
@@ -196,7 +208,7 @@ async def test_user_cannot_approve(client: AsyncClient):
             "operation_status": "pending",
             "activity_code": "CLIENT_DATA_TRANSFER"
         },
-        headers=admin_headers,
+        headers=user_headers,
     )
     ticket_id = t_resp.json()["id"]
     
@@ -209,6 +221,9 @@ async def test_manager_can_delete_ticket(client: AsyncClient):
     manager_login = await client.post("/auth/login", json={"email": "alice@company.com", "password": "password123"})
     manager_headers = {"Authorization": f"Bearer {manager_login.json()['access_token']}"}
 
+    user_login = await client.post("/auth/login", json={"email": "john@company.com", "password": "password123"})
+    user_headers = {"Authorization": f"Bearer {user_login.json()['access_token']}"}
+
     cats = (await client.get("/categories")).json()
     t_resp = await client.post(
         "/tickets",
@@ -218,7 +233,7 @@ async def test_manager_can_delete_ticket(client: AsyncClient):
             "category_id": cats[0]["id"],
             "priority": "low",
         },
-        headers=manager_headers,
+        headers=user_headers,
     )
     assert t_resp.status_code == 201
     ticket_id = t_resp.json()["id"]
@@ -281,4 +296,80 @@ async def test_delete_nonexistent_ticket(client: AsyncClient):
 
     del_resp = await client.delete("/tickets/00000000-0000-0000-0000-000000000000", headers=manager_headers)
     assert del_resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_non_user_cannot_create_ticket(client: AsyncClient):
+    agent_login = await client.post("/auth/login", json={"email": "bob@company.com", "password": "password123"})
+    agent_headers = {"Authorization": f"Bearer {agent_login.json()['access_token']}"}
+
+    cats = (await client.get("/categories")).json()
+    create_resp = await client.post(
+        "/tickets",
+        json={
+            "title": "Agent Attempted Ticket",
+            "description": "Agents cannot create tickets",
+            "category_id": cats[0]["id"],
+            "priority": "low",
+        },
+        headers=agent_headers,
+    )
+    assert create_resp.status_code in [403, 422]
+    assert "Only requester user profile is authorized to create tickets" in create_resp.text
+
+
+@pytest.mark.asyncio
+async def test_reopen_ticket_limit_max_2_times(client: AsyncClient):
+    user_login = await client.post("/auth/login", json={"email": "john@company.com", "password": "password123"})
+    user_headers = {"Authorization": f"Bearer {user_login.json()['access_token']}"}
+
+    agent_login = await client.post("/auth/login", json={"email": "bob@company.com", "password": "password123"})
+    agent_headers = {"Authorization": f"Bearer {agent_login.json()['access_token']}"}
+
+    cats = (await client.get("/categories")).json()
+    t_resp = await client.post(
+        "/tickets",
+        json={
+            "title": "Reopen Limit Verification Ticket",
+            "description": "Verify that a ticket can be reopened at most 2 times.",
+            "category_id": cats[0]["id"],
+            "priority": "medium",
+        },
+        headers=user_headers,
+    )
+    assert t_resp.status_code == 201
+    ticket_id = t_resp.json()["id"]
+
+    # Agent starts and resolves ticket first time
+    await client.post(f"/tickets/{ticket_id}/start-work", headers=agent_headers)
+    res1 = await client.post(f"/tickets/{ticket_id}/complete-work", json={"notes": "Resolved attempt 1"}, headers=agent_headers)
+    assert res1.status_code == 200
+    assert res1.json()["status"] == "resolved"
+
+    # 1. First Reopen (Attempt 1 of 2) -> Allowed
+    reopen1 = await client.post(f"/tickets/{ticket_id}/reopen", headers=user_headers)
+    assert reopen1.status_code == 200
+    assert reopen1.json()["status"] == "reopened"
+
+    # Agent starts and resolves ticket second time
+    await client.post(f"/tickets/{ticket_id}/start-work", headers=agent_headers)
+    res2 = await client.post(f"/tickets/{ticket_id}/complete-work", json={"notes": "Resolved attempt 2"}, headers=agent_headers)
+    assert res2.status_code == 200
+    assert res2.json()["status"] == "resolved"
+
+    # 2. Second Reopen (Attempt 2 of 2) -> Allowed
+    reopen2 = await client.post(f"/tickets/{ticket_id}/reopen", headers=user_headers)
+    assert reopen2.status_code == 200
+    assert reopen2.json()["status"] == "reopened"
+
+    # Agent starts and resolves ticket third time
+    await client.post(f"/tickets/{ticket_id}/start-work", headers=agent_headers)
+    res3 = await client.post(f"/tickets/{ticket_id}/complete-work", json={"notes": "Resolved attempt 3"}, headers=agent_headers)
+    assert res3.status_code == 200
+    assert res3.json()["status"] == "resolved"
+
+    # 3. Third Reopen -> Must be BLOCKED (422)
+    reopen3 = await client.post(f"/tickets/{ticket_id}/reopen", headers=user_headers)
+    assert reopen3.status_code == 422
+    assert "maximum limit of 2 reopens" in reopen3.text
 

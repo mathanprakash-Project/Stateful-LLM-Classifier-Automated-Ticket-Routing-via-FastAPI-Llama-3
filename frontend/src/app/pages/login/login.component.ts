@@ -12,23 +12,23 @@ import { AuthService } from '../../services/auth.service';
     <div class="login-wrapper">
       <div class="login-card animate-scale">
         <div class="brand-logo">
-          <span class="material-symbols-outlined logo-icon">token</span>
-          <div class="brand-text">
-            <span class="brand-title">SupportHub <span class="brand-badge">AI</span></span>
-            <span class="brand-subtitle">Autonomous IT Operations</span>
+          <div class="brand-row">
+            <span class="brand-title">SupportHub</span>
+            <span class="brand-badge">AI</span>
           </div>
+          <span class="brand-subtitle">Autonomous IT Support & Governance Platform</span>
         </div>
         
         <form (ngSubmit)="onSubmit()" class="login-form">
           <div class="form-group">
-            <label class="form-label">Email</label>
-            <input type="email" class="form-input" [(ngModel)]="email" name="email" required placeholder="Enter your email">
+            <label class="form-label">Email Address</label>
+            <input type="email" class="form-input" [(ngModel)]="email" name="email" required placeholder="name@company.com">
           </div>
           
           <div class="form-group">
             <label class="form-label">Password</label>
             <div class="password-wrapper">
-              <input [type]="showPassword ? 'text' : 'password'" class="form-input" [(ngModel)]="password" name="password" required placeholder="Enter your password">
+              <input [type]="showPassword ? 'text' : 'password'" class="form-input" [(ngModel)]="password" name="password" required placeholder="••••••••">
               <button type="button" class="icon-btn eye-btn" (click)="showPassword = !showPassword">
                 <span class="material-symbols-outlined">{{ showPassword ? 'visibility_off' : 'visibility' }}</span>
               </button>
@@ -78,10 +78,17 @@ import { AuthService } from '../../services/auth.service';
       color: var(--primary);
       filter: drop-shadow(0 0 12px rgba(var(--primary-rgb), 0.5));
     }
+    .brand-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      justify-content: center;
+    }
     .brand-title {
       font-family: var(--font-heading);
-      font-size: 1.5rem;
-      font-weight: 700;
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: #ffffff;
       letter-spacing: -0.02em;
     }
     .brand-badge {

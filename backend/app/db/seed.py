@@ -152,6 +152,7 @@ async def seed_data(session: AsyncSession):
         {"email": "john@company.com", "full_name": "John Doe", "role": UserRoleEnum.USER.value},
         {"email": "jane@company.com", "full_name": "Jane Smith", "role": UserRoleEnum.USER.value},
         {"email": "bob@company.com", "full_name": "Agent Bob", "role": UserRoleEnum.AGENT.value},
+        {"email": "bob@company.com", "full_name": "Employee Bob", "role": UserRoleEnum.AGENT.value},
         {"email": "alice@company.com", "full_name": "Manager Alice", "role": UserRoleEnum.MANAGER.value},
         {"email": "admin@company.com", "full_name": "Admin Root", "role": UserRoleEnum.ADMIN.value},
     ]

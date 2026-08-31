@@ -46,6 +46,18 @@ ALLOWED_TRANSITIONS: Dict[Tuple[str, str], Set[str]] = {
     # Rejected tickets
     ("rejected", "closed"): {"manager", "admin"},
     ("rejected", "reopened"): {"manager", "admin"},
+    # 2-Month Archival Retention & Renewal Policy
+    ("resolved", "archived"): {UserRole.USER.value, UserRole.AGENT.value, UserRole.MANAGER.value, UserRole.ADMIN.value},
+    ("closed", "archived"): {UserRole.USER.value, UserRole.AGENT.value, UserRole.MANAGER.value, UserRole.ADMIN.value},
+    ("open", "archived"): {UserRole.USER.value, UserRole.MANAGER.value, UserRole.ADMIN.value},
+    ("archived", "reopened"): {UserRole.USER.value, UserRole.AGENT.value, UserRole.MANAGER.value, UserRole.ADMIN.value},
+    ("archived", "open"): {UserRole.USER.value, UserRole.AGENT.value, UserRole.MANAGER.value, UserRole.ADMIN.value},
+    # Transitions from reopened
+    ("reopened", "in_progress"): {UserRole.AGENT.value, UserRole.MANAGER.value, UserRole.ADMIN.value},
+    ("reopened", "assigned"): {UserRole.AGENT.value, UserRole.MANAGER.value, UserRole.ADMIN.value},
+    ("reopened", "resolved"): {UserRole.AGENT.value, UserRole.MANAGER.value, UserRole.ADMIN.value},
+    ("reopened", "closed"): {UserRole.USER.value, UserRole.AGENT.value, UserRole.MANAGER.value, UserRole.ADMIN.value},
+    ("reopened", "cancelled"): {UserRole.MANAGER.value, UserRole.ADMIN.value},
 }
 
 

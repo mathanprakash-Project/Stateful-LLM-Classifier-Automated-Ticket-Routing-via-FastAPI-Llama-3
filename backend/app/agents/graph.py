@@ -16,6 +16,12 @@ from app.agents.state import AgentState
 
 
 def route_by_intent(state: AgentState) -> Literal["extract_info", "generate_response"]:
+    user_role = (state.get("user_role") or "user").lower()
+    # Non-user roles (Employee, Manager, Admin) use the assistant as an Operational & Technical Advisor
+    # They do not create tickets, so we route directly to generate_response to answer their doubts.
+    if user_role != "user":
+        return "generate_response"
+
     intent = state.get("intent", "APPLICATION_OTHER")
     # Intents that go directly to response generation (no ticket extraction needed)
     skip_extraction_intents = {"NON_TECHNICAL", "out_of_scope", "ticket_status", "general_query"}
@@ -26,6 +32,10 @@ def route_by_intent(state: AgentState) -> Literal["extract_info", "generate_resp
 
 
 def route_completeness(state: AgentState) -> Literal["generate_draft", "generate_response"]:
+    user_role = (state.get("user_role") or "user").lower()
+    if user_role != "user":
+        return "generate_response"
+
     missing = state.get("missing_fields", [])
     if not missing:
         return "generate_draft"
@@ -79,11 +89,13 @@ async def run_chat_turn(
     user_message: str,
     existing_messages: list[dict],
     current_state: dict,
+    user_role: str = "user",
 ) -> dict:
     state_input: AgentState = {
         "session_id": session_id,
         "user_id": user_id,
         "user_name": user_name,
+        "user_role": user_role,
         "current_user_message": user_message,
         "messages": existing_messages,
         "intent": current_state.get("intent"),

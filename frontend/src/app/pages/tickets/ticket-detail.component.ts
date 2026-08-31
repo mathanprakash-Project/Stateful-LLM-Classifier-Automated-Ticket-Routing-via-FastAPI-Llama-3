@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { ApiService } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
+import { ToastService } from '../../services/toast.service';
 
 @Component({
   selector: 'app-ticket-detail',
@@ -108,6 +109,7 @@ import { AuthService } from '../../services/auth.service';
         <div class="admin-action-panel mb-6 animate-fade" *ngIf="isAdmin() && selectedTicket.status === 'pending_admin_approval'">
           <h4 class="form-label text-warning"><span class="material-symbols-outlined">shield</span> Admin Governance: Review Restricted Operation</h4>
           <p class="text-sm text-muted mb-3">This high-impact operation requires Administrator sign-off. Once approved, assign an Agent (Employee) to execute the work.</p>
+          <p class="text-sm text-muted mb-3">This high-impact operation requires Administrator sign-off. Once approved, assign an Employee to execute the work.</p>
           <div class="flex gap-2">
             <button class="btn btn-success" (click)="approveOperation()"><span class="material-symbols-outlined">check_circle</span> Approve Operation</button>
             <button class="btn btn-danger" (click)="rejectOperation()"><span class="material-symbols-outlined">cancel</span> Reject Operation</button>
@@ -118,15 +120,18 @@ import { AuthService } from '../../services/auth.service';
         <div class="admin-action-panel mb-6 animate-fade" *ngIf="isAdmin() && selectedTicket.status === 'approved'">
           <h4 class="form-label text-success"><span class="material-symbols-outlined">verified</span> Approved — Ready for Agent Assignment</h4>
           <p class="text-sm text-muted mb-3">Assign this approved maintenance ticket to an Agent (Employee) to perform and complete the activity.</p>
+          <h4 class="form-label text-success"><span class="material-symbols-outlined">verified</span> Approved — Ready for Employee Assignment</h4>
+          <p class="text-sm text-muted mb-3">Assign this approved maintenance ticket to an Employee to perform and complete the activity.</p>
           <div class="flex gap-2 items-center">
             <select class="form-select flex-1" [(ngModel)]="targetAssigneeEmail">
               <option value="">-- Select Agent (Employee) --</option>
+              <option value="">-- Select Employee --</option>
               <option *ngFor="let u of availableAgents" [value]="u.id">
                 {{ u.name }} ({{ u.email }})
               </option>
             </select>
             <button class="btn btn-primary" (click)="assignToSelectedAgent()" [disabled]="!targetAssigneeEmail">
-              <span class="material-symbols-outlined">person_add</span> Assign to Agent
+              <span class="material-symbols-outlined">person_add</span> Assign to Employee
             </button>
           </div>
         </div>
@@ -137,12 +142,12 @@ import { AuthService } from '../../services/auth.service';
           <p class="text-sm text-muted mb-3">This issue is outside Application Support scope. Route it to the appropriate specialized infrastructure team.</p>
           <div class="flex gap-2 items-center">
             <select class="form-select" [(ngModel)]="routeTeam">
-              <option value="">-- Select Target Team --</option>
-              <option value="INFRASTRUCTURE">Infrastructure / Systems Engineering</option>
-              <option value="DATABASE">Database Administrators (DBA)</option>
-              <option value="NETWORK">Network Operations & Security</option>
-              <option value="SECURITY">Enterprise Infosec & Compliance</option>
-              <option value="APPLICATION_SUPPORT">Application Support</option>
+              <option value="">-- Select Target Team (DB / SM / Infrastructure) --</option>
+              <option value="DB">🗄️ DB (Database Administrators / DBA)</option>
+              <option value="SM">🖥️ SM (Server Management & Infrastructure)</option>
+              <option value="NETWORK">🌐 Network Operations & Security</option>
+              <option value="SECURITY">🔒 Enterprise Infosec & Compliance</option>
+              <option value="APPLICATION_SUPPORT">💻 Application Support (Re-assign)</option>
             </select>
             <button class="btn btn-primary" (click)="routeTicket()" [disabled]="!routeTeam">
               <span class="material-symbols-outlined">send</span> Route Ticket
@@ -150,9 +155,25 @@ import { AuthService } from '../../services/auth.service';
           </div>
         </div>
 
-        <!-- 4. AGENT (EMPLOYEE) EXECUTION CONTROLS -->
-        <div class="admin-action-panel mb-6 animate-fade" *ngIf="isAgentOrStaff() && (selectedTicket.status === 'open' || selectedTicket.status === 'assigned' || selectedTicket.status === 'approved')">
-          <h4 class="form-label text-accent"><span class="material-symbols-outlined">engineering</span> Employee / Agent Execution Panel</h4>
+        <!-- 3B. ROUTED TICKET STATUS BANNER -->
+        <div class="admin-action-panel mb-6 animate-fade" *ngIf="selectedTicket.status === 'routed'">
+          <h4 class="form-label text-info flex items-center gap-2">
+            <span class="material-symbols-outlined">alt_route</span> Out-of-Scope: Ticket Successfully Routed
+          </h4>
+          <p class="text-sm text-muted mb-3">This request is outside Application Support scope and has been routed to the <strong>{{ selectedTicket.routed_to_team || 'External Team' }}</strong> team for execution.</p>
+          <div class="flex gap-2 items-center flex-wrap" *ngIf="isManagerOrAdmin()">
+            <button class="btn btn-outlined" (click)="reopenTicket()" title="Reopen or Reroute Ticket">
+              <span class="material-symbols-outlined">replay</span> Reroute / Reopen
+            </button>
+            <button class="btn btn-danger" (click)="deleteTicket()" title="Permanently Delete Ticket">
+              <span class="material-symbols-outlined">delete</span> Delete Ticket (Manager)
+            </button>
+          </div>
+        </div>
+
+        <!-- 4. EMPLOYEE EXECUTION CONTROLS -->
+        <div class="admin-action-panel mb-6 animate-fade" *ngIf="isAgentOrStaff() && (selectedTicket.status === 'open' || selectedTicket.status === 'assigned' || selectedTicket.status === 'approved' || selectedTicket.status === 'reopened')">
+          <h4 class="form-label text-accent"><span class="material-symbols-outlined">engineering</span> Employee Execution Panel <span *ngIf="selectedTicket.status === 'reopened'" class="badge-role-tag role-manager" style="margin-left: 8px;">Reopened Activity ({{ getReopenCount() }}/2)</span></h4>
           <p class="text-sm text-muted mb-3">Pick up this maintenance activity to start work and progress it through execution.</p>
           <button class="btn btn-primary" (click)="startWork()">
             <span class="material-symbols-outlined">play_arrow</span> Start Work (In Progress)
@@ -176,6 +197,7 @@ import { AuthService } from '../../services/auth.service';
         <div class="admin-action-panel mb-6 animate-fade" *ngIf="selectedTicket.status === 'resolved'">
           <h4 class="form-label text-success flex items-center gap-2">
             <span class="material-symbols-outlined">task_alt</span> Operational Activity Resolved
+            <span *ngIf="getReopenCount() > 0" class="badge-role-tag role-manager" style="margin-left: 8px;">Reopened {{ getReopenCount() }}/2 times</span>
           </h4>
           <p class="text-sm text-muted mb-3">This maintenance activity has been completed and verified. You can permanently close the ticket or, as a Manager, delete it.</p>
           <div class="flex gap-2 items-center flex-wrap">
@@ -185,8 +207,11 @@ import { AuthService } from '../../services/auth.service';
             <button *ngIf="isManagerOrAdmin()" class="btn btn-danger" (click)="deleteTicket()" title="Permanently Delete Ticket">
               <span class="material-symbols-outlined">delete</span> Delete Ticket (Manager)
             </button>
-            <button class="btn btn-outlined" (click)="reopenTicket()" title="Reopen Ticket">
-              <span class="material-symbols-outlined">replay</span> Reopen Ticket
+            <button *ngIf="getReopenCount() < 2" class="btn btn-outlined" (click)="reopenTicket()" title="Reopen Ticket (Attempt {{ getReopenCount() + 1 }} of 2)">
+              <span class="material-symbols-outlined">replay</span> Reopen Ticket ({{ getReopenCount() }}/2)
+            </button>
+            <button *ngIf="getReopenCount() >= 2" class="btn btn-outlined btn-disabled-hint" disabled title="Maximum 2 reopens reached">
+              <span class="material-symbols-outlined">lock</span> Max Reopens (2/2) Reached
             </button>
           </div>
         </div>
@@ -194,15 +219,35 @@ import { AuthService } from '../../services/auth.service';
         <!-- 6. CLOSED TICKET PANEL -->
         <div class="admin-action-panel mb-6 animate-fade" *ngIf="selectedTicket.status === 'closed'">
           <h4 class="form-label text-muted flex items-center gap-2">
-            <span class="material-symbols-outlined">lock</span> Ticket Closed & Archived
+            <span class="material-symbols-outlined">lock</span> Ticket Closed
+            <span *ngIf="getReopenCount() > 0" class="badge-role-tag role-manager" style="margin-left: 8px;">Reopened {{ getReopenCount() }}/2 times</span>
           </h4>
           <p class="text-sm text-muted mb-3">This ticket is closed. As a Manager, you can permanently delete it or reopen it if needed.</p>
           <div class="flex gap-2 items-center flex-wrap">
             <button *ngIf="isManagerOrAdmin()" class="btn btn-danger" (click)="deleteTicket()" title="Permanently Delete Ticket">
               <span class="material-symbols-outlined">delete</span> Delete Ticket (Manager)
             </button>
-            <button class="btn btn-outlined" (click)="reopenTicket()" title="Reopen Ticket">
-              <span class="material-symbols-outlined">replay</span> Reopen Ticket
+            <button *ngIf="getReopenCount() < 2" class="btn btn-outlined" (click)="reopenTicket()" title="Reopen Ticket (Attempt {{ getReopenCount() + 1 }} of 2)">
+              <span class="material-symbols-outlined">replay</span> Reopen Ticket ({{ getReopenCount() }}/2)
+            </button>
+            <button *ngIf="getReopenCount() >= 2" class="btn btn-outlined btn-disabled-hint" disabled title="Maximum 2 reopens reached">
+              <span class="material-symbols-outlined">lock</span> Max Reopens (2/2) Reached
+            </button>
+          </div>
+        </div>
+
+        <!-- 7. ARCHIVED 2-MONTH RETENTION PANEL -->
+        <div class="admin-action-panel mb-6 animate-fade" *ngIf="selectedTicket.status === 'archived'">
+          <h4 class="form-label text-warning flex items-center gap-2">
+            <span class="material-symbols-outlined">inventory_2</span> Ticket Archived (2-Month Retention Window)
+          </h4>
+          <p class="text-sm text-muted mb-3">This ticket was retained for 2 months and automatically transitioned to Archived status. You can renew and reopen it at any time to resume support.</p>
+          <div class="flex gap-2 items-center flex-wrap">
+            <button class="btn btn-primary" (click)="renewTicket()">
+              <span class="material-symbols-outlined">restart_alt</span> Renew & Reopen Ticket
+            </button>
+            <button *ngIf="isManagerOrAdmin()" class="btn btn-danger" (click)="deleteTicket()" title="Permanently Delete Ticket">
+              <span class="material-symbols-outlined">delete</span> Delete Ticket (Manager)
             </button>
           </div>
         </div>
@@ -244,101 +289,141 @@ import { AuthService } from '../../services/auth.service';
           </div>
         </div>
       </div>
+
+      <!-- REOPEN CONFIRMATION & CROSS-CHECK MODAL -->
+      <div *ngIf="showReopenModal" class="modal-backdrop animate-fade" (click)="showReopenModal = false">
+        <div class="modal-dialog card-surface animate-pop" (click)="$event.stopPropagation()" style="max-width: 520px; border: 1px solid var(--corona-orange);">
+          <div class="modal-header flex justify-between items-center pb-3 border-b" style="border-color: var(--corona-border);">
+            <div class="flex items-center gap-2">
+              <span class="material-symbols-outlined" style="font-size: 26px; color: var(--corona-orange);">warning</span>
+              <h3 class="modal-title" style="font-size: 1.1rem; color: #ffffff; margin: 0;">Cross-Check Before Reopen</h3>
+            </div>
+            <button class="icon-btn" (click)="showReopenModal = false">
+              <span class="material-symbols-outlined">close</span>
+            </button>
+          </div>
+
+          <div class="modal-body" style="padding: 18px 0;">
+            <div class="p-3 mb-3" style="background: rgba(255, 171, 0, 0.12); border: 1px solid var(--corona-orange); border-radius: var(--radius-sm);">
+              <p style="font-size: 0.9rem; font-weight: 700; color: var(--corona-orange); margin: 0 0 6px 0;">
+                ⚠️ Please cross-check the ticket before it is reopened!
+              </p>
+              <p style="font-size: 0.82rem; color: #ffffff; margin: 0; line-height: 1.4;">
+                <strong>Policy Notice:</strong> A resolved ticket can only be reopened a <strong>maximum of 2 times</strong>.
+                <br />
+                This action will be <strong>reopen attempt {{ getReopenCount() + 1 }} of 2</strong>.
+              </p>
+            </div>
+
+            <p style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.5; margin: 0;">
+              Once reopened, support employees can pick up the ticket, perform maintenance again, and resolve it upon verification.
+            </p>
+          </div>
+
+          <div class="modal-footer flex justify-end gap-2 pt-3 border-t" style="border-color: var(--corona-border);">
+            <button class="btn btn-outlined" (click)="showReopenModal = false">Cancel</button>
+            <button class="btn btn-primary" (click)="confirmReopen()">
+              <span class="material-symbols-outlined">replay</span> Confirm & Reopen Ticket
+            </button>
+          </div>
+        </div>
+      </div>
+
     </div>
   `,
   styles: [`
-    .view-panel { padding: 28px 36px; max-width: 900px; margin: 0 auto; }
-    .view-header { display: flex; align-items: center; margin-bottom: 24px; }
+    .view-panel { padding: 0; max-width: 960px; margin: 0 auto; }
+    .view-header { display: flex; align-items: center; margin-bottom: 20px; }
     
-    .icon-btn { background: transparent; border: none; color: var(--text-muted); cursor: pointer; padding: 6px; border-radius: var(--radius-full); display: grid; place-items: center; }
-    .icon-btn:hover { background: var(--bg-subtle); color: var(--text-main); }
+    .icon-btn { background: transparent; border: none; color: var(--text-muted); cursor: pointer; padding: 6px; border-radius: 4px; display: grid; place-items: center; }
+    .icon-btn:hover { background: rgba(255, 255, 255, 0.05); color: #ffffff; }
     
     .ticket-header-meta { display: flex; align-items: center; gap: 12px; }
-    .ticket-lg-num { font-size: 1.5rem; font-weight: 700; color: var(--primary); font-family: var(--font-heading); }
+    .ticket-lg-num { font-size: 1.4rem; font-weight: 800; color: var(--corona-purple); font-family: var(--font-heading); }
     
-    .card-surface { background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 32px; box-shadow: var(--shadow-sm); }
-    .card-subtle { background: var(--bg-subtle); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); }
+    .card-surface { background: var(--corona-surface); border: 1px solid var(--corona-border); border-radius: var(--radius-sm); padding: 24px; }
+    .card-subtle { background: #000000; border: 1px solid var(--corona-border); border-radius: var(--radius-sm); }
     .p-4 { padding: 16px; }
     
-    .status-badge { display: inline-block; padding: 4px 10px; border-radius: var(--radius-full); font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
-    .status-open { background: rgba(245, 158, 11, 0.12); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
-    .status-assigned { background: rgba(168, 85, 247, 0.12); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); }
-    .status-in_progress { background: rgba(6, 182, 212, 0.12); color: #22d3ee; border: 1px solid rgba(6, 182, 212, 0.3); }
-    .status-escalated { background: rgba(239, 68, 68, 0.12); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
-    .status-resolved { background: rgba(16, 185, 129, 0.12); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
-    .status-closed { background: rgba(100, 116, 139, 0.12); color: #94a3b8; border: 1px solid rgba(100, 116, 139, 0.3); }
-    .status-cancelled { background: rgba(239, 68, 68, 0.1); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.2); }
-    .status-pending_manager_routing { background: rgba(249, 115, 22, 0.12); color: #fb923c; border: 1px solid rgba(249, 115, 22, 0.3); }
-    .status-pending_admin_approval { background: rgba(234, 179, 8, 0.12); color: #facc15; border: 1px solid rgba(234, 179, 8, 0.3); }
-    .status-approved { background: rgba(16, 185, 129, 0.12); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
-    .status-rejected { background: rgba(239, 68, 68, 0.12); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
-    .status-routed { background: rgba(59, 130, 246, 0.12); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); }
-    .status-reopened { background: rgba(168, 85, 247, 0.12); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); }
+    .status-badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.68rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; }
+    .status-open { background: rgba(255, 171, 0, 0.15); color: var(--corona-orange); }
+    .status-assigned { background: rgba(143, 95, 232, 0.15); color: var(--corona-purple); }
+    .status-in_progress { background: rgba(0, 144, 231, 0.15); color: var(--corona-blue); }
+    .status-escalated { background: rgba(252, 66, 74, 0.15); color: var(--corona-red); }
+    .status-resolved { background: rgba(0, 210, 91, 0.15); color: var(--corona-green); }
+    .status-closed { background: rgba(108, 114, 147, 0.15); color: var(--text-muted); }
+    .status-cancelled { background: rgba(252, 66, 74, 0.15); color: var(--corona-red); }
+    .status-pending_manager_routing { background: rgba(255, 171, 0, 0.15); color: var(--corona-orange); }
+    .status-pending_admin_approval { background: rgba(252, 66, 74, 0.15); color: var(--corona-red); }
+    .status-approved { background: rgba(0, 210, 91, 0.15); color: var(--corona-green); }
+    .status-rejected { background: rgba(252, 66, 74, 0.15); color: var(--corona-red); }
+    .status-routed { background: rgba(143, 95, 232, 0.15); color: var(--corona-purple); }
+    .status-reopened { background: rgba(143, 95, 232, 0.15); color: var(--corona-purple); }
     
     .activity-info-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-    .activity-badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: var(--radius-full); background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.3); color: var(--primary); font-size: 0.78rem; font-weight: 700; text-transform: uppercase; }
+    .activity-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 4px; background: rgba(143, 95, 232, 0.15); border: 1px solid rgba(143, 95, 232, 0.3); color: var(--corona-purple); font-size: 0.75rem; font-weight: 700; text-transform: uppercase; }
     .activity-badge .material-symbols-outlined { font-size: 16px; }
-    .restriction-badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: var(--radius-full); font-size: 0.78rem; font-weight: 700; }
-    .restriction-badge.warn { background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.3); color: #fbbf24; }
-    .restriction-badge.info { background: rgba(59, 130, 246, 0.12); border: 1px solid rgba(59, 130, 246, 0.3); color: #60a5fa; }
+    .restriction-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 700; }
+    .restriction-badge.warn { background: rgba(255, 171, 0, 0.15); border: 1px solid rgba(255, 171, 0, 0.3); color: var(--corona-orange); }
+    .restriction-badge.info { background: rgba(0, 144, 231, 0.15); border: 1px solid rgba(0, 144, 231, 0.3); color: var(--corona-blue); }
     .restriction-badge .material-symbols-outlined { font-size: 16px; }
-    .operation-status-badge { display: inline-block; padding: 4px 10px; border-radius: var(--radius-full); font-size: 0.72rem; font-weight: 700; text-transform: uppercase; background: var(--bg-subtle); border: 1px solid var(--border); color: var(--text-dim); }
+    .operation-status-badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.68rem; font-weight: 700; text-transform: uppercase; background: #000; border: 1px solid var(--corona-border); color: var(--text-muted); }
 
-    .operational-banner { background: var(--bg-subtle); border: 1px solid var(--border); border-radius: var(--radius-md); }
-    .op-mode-pill { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: var(--radius-full); font-size: 0.72rem; font-weight: 700; text-transform: uppercase; background: rgba(99, 102, 241, 0.12); color: var(--primary); border: 1px solid rgba(99, 102, 241, 0.3); }
+    .operational-banner { background: #000000; border: 1px solid var(--corona-border); border-radius: var(--radius-sm); }
+    .op-mode-pill { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; background: rgba(143, 95, 232, 0.15); color: var(--corona-purple); border: 1px solid rgba(143, 95, 232, 0.3); }
     .op-mode-pill .material-symbols-outlined { font-size: 14px; }
-    .op-downtime-pill { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: var(--radius-full); font-size: 0.72rem; font-weight: 700; background: rgba(16, 185, 129, 0.12); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
-    .op-downtime-pill.downtime-warn { background: rgba(239, 68, 68, 0.12); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
-    .op-downtime-pill.downtime-lockout { background: rgba(245, 158, 11, 0.12); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
+    .op-downtime-pill { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 700; background: rgba(0, 210, 91, 0.15); color: var(--corona-green); border: 1px solid rgba(0, 210, 91, 0.3); }
+    .op-downtime-pill.downtime-warn { background: rgba(252, 66, 74, 0.15); color: var(--corona-red); border: 1px solid rgba(252, 66, 74, 0.3); }
+    .op-downtime-pill.downtime-lockout { background: rgba(255, 171, 0, 0.15); color: var(--corona-orange); border: 1px solid rgba(255, 171, 0, 0.3); }
     .op-downtime-pill .material-symbols-outlined { font-size: 14px; }
-    .prereq-badge { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: var(--radius-full); font-size: 0.72rem; font-weight: 700; background: rgba(16, 185, 129, 0.12); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
+    .prereq-badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 700; background: rgba(0, 210, 91, 0.15); color: var(--corona-green); border: 1px solid rgba(0, 210, 91, 0.3); }
     .prereq-badge .material-symbols-outlined { font-size: 14px; }
 
-    .admin-action-panel { background: var(--bg-subtle); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 18px; }
-    .admin-action-panel h4 { display: flex; align-items: center; gap: 8px; }
+    .admin-action-panel { background: #000000; border: 1px solid var(--corona-border); border-radius: var(--radius-sm); padding: 18px; }
+    .admin-action-panel h4 { display: flex; align-items: center; gap: 8px; color: #ffffff; }
     .admin-action-panel h4 .material-symbols-outlined { font-size: 20px; }
 
-    .btn-success { background: linear-gradient(135deg, var(--success), #059669); color: #fff; border: none; }
-    .btn-danger { background: linear-gradient(135deg, var(--danger), #dc2626); color: #fff; border: none; }
-    .text-warning { color: var(--warning); }
-    .text-info { color: var(--info); }
-    .text-success { color: var(--success); }
+    .btn-success { background: var(--corona-green); color: #000; font-weight: 700; border: none; }
+    .btn-danger { background: var(--corona-red); color: #fff; border: none; }
+    .text-warning { color: var(--corona-orange); }
+    .text-info { color: var(--corona-blue); }
+    .text-success { color: var(--corona-green); }
     
-    .badge-priority { font-size: 0.75rem; font-weight: 800; text-transform: uppercase; }
-    .priority-low { color: #34d399; }
-    .priority-medium { color: #fbbf24; }
-    .priority-high { color: #f87171; }
-    .priority-critical { color: #ff0055; text-shadow: 0 0 10px rgba(255, 0, 85, 0.4); }
+    .badge-priority { font-size: 0.72rem; font-weight: 800; text-transform: uppercase; }
+    .priority-low { color: var(--corona-green); }
+    .priority-medium { color: var(--corona-orange); }
+    .priority-high { color: var(--corona-red); }
+    .priority-critical { color: #ff0055; text-shadow: 0 0 8px rgba(255, 0, 85, 0.4); }
     
-    .form-label { display: block; font-size: 0.75rem; font-weight: 700; color: var(--text-dim); text-transform: uppercase; margin-bottom: 6px; }
-    .form-select, .form-input, .form-textarea { padding: 8px 12px; border-radius: var(--radius-md); background: var(--bg-surface-elevated); border: 1px solid var(--border); color: var(--text-main); font-family: inherit; font-size: 0.88rem; outline: none; }
-    .btn { padding: 9px 16px; border-radius: var(--radius-md); font-family: inherit; font-weight: 600; font-size: 0.85rem; border: 1px solid transparent; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: var(--transition); }
-    .btn-primary { background: linear-gradient(135deg, var(--primary), var(--primary-hover)); color: #fff; }
+    .form-label { display: block; font-size: 0.72rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px; }
+    .form-select, .form-input, .form-textarea { padding: 8px 12px; border-radius: var(--radius-sm); background: #000000; border: 1px solid var(--corona-border); color: #ffffff; font-family: inherit; font-size: 0.85rem; outline: none; }
+    .btn { padding: 8px 16px; border-radius: var(--radius-sm); font-family: inherit; font-weight: 600; font-size: 0.85rem; border: 1px solid transparent; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: var(--transition); }
+    .btn-primary { background: var(--corona-green); color: #000; font-weight: 700; }
     .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
-    .btn-outlined { background: transparent; border-color: var(--border); color: var(--text-main); }
-    .btn-outlined:hover { background: var(--bg-subtle); }
-    .btn-danger { background: #ef4444; color: #fff; border-color: #dc2626; }
-    .btn-danger:hover { background: #dc2626; }
+    .btn-outlined { background: transparent; border-color: var(--corona-border); color: #ffffff; }
+    .btn-outlined:hover { background: rgba(255, 255, 255, 0.05); border-color: var(--corona-purple); }
+    .btn-danger { background: var(--corona-red); color: #fff; }
+    .btn-danger:hover { background: #e6323a; }
     .btn-disabled-hint { opacity: 0.4; cursor: not-allowed; }
-    .btn-sm { padding: 7px 12px; font-size: 0.78rem; }
+    .btn-sm { padding: 5px 10px; font-size: 0.75rem; }
     
-    .timeline-stream { border-left: 2px solid var(--border); margin-left: 12px; padding-left: 16px; display: flex; flex-direction: column; gap: 14px; }
+    .timeline-stream { border-left: 2px solid var(--corona-border); margin-left: 12px; padding-left: 16px; display: flex; flex-direction: column; gap: 14px; }
     .timeline-node { position: relative; font-size: 0.82rem; }
-    .node-marker { position: absolute; left: -21px; top: 4px; width: 8px; height: 8px; border-radius: 50%; background: var(--primary); }
-    .node-field { font-weight: 700; color: var(--text-dim); }
-    .node-new { font-weight: 700; color: var(--accent); }
+    .node-marker { position: absolute; left: -21px; top: 4px; width: 8px; height: 8px; border-radius: 50%; background: var(--corona-purple); box-shadow: 0 0 6px var(--corona-purple); }
+    .node-field { font-weight: 700; color: var(--text-muted); }
+    .node-new { font-weight: 700; color: var(--corona-blue); }
     .node-time { font-size: 0.7rem; color: var(--text-dim); margin-top: 2px; }
     
     .comments-list { display: flex; flex-direction: column; gap: 12px; }
-    .comment-bubble { background: var(--bg-subtle); padding: 12px 16px; border-radius: var(--radius-md); font-size: 0.88rem; border: 1px solid var(--border-subtle); }
+    .comment-bubble { background: #000000; padding: 12px 16px; border-radius: var(--radius-sm); font-size: 0.88rem; border: 1px solid var(--corona-border); color: #ffffff; }
     .comment-header { display: flex; justify-content: space-between; margin-bottom: 6px; }
     
-    .text-main { color: var(--text-main); }
+    .text-main { color: #ffffff; }
     .text-muted { color: var(--text-muted); }
-    .text-accent { color: var(--accent); }
+    .text-accent { color: var(--corona-blue); }
     .text-sm { font-size: 0.8rem; }
     .text-xs { font-size: 0.7rem; }
-    .text-xl { font-size: 1.25rem; }
+    .text-xl { font-size: 1.2rem; }
     .font-bold { font-weight: 700; }
     .uppercase { text-transform: uppercase; }
     .mb-2 { margin-bottom: 8px; }
@@ -359,7 +444,7 @@ import { AuthService } from '../../services/auth.service';
     .whitespace-pre-wrap { white-space: pre-wrap; }
     .leading-relaxed { line-height: 1.6; }
     
-    .animate-fade { animation: fadeIn 0.25s ease-out; }
+    .animate-fade { animation: fadeIn 0.2s ease-out; }
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
   `]
 })
@@ -369,6 +454,7 @@ export class TicketDetailComponent implements OnInit {
   router = inject(Router);
   cdr = inject(ChangeDetectorRef);
   auth = inject(AuthService);
+  toast = inject(ToastService);
 
   selectedTicket: any = null;
   targetStatus = '';
@@ -376,6 +462,7 @@ export class TicketDetailComponent implements OnInit {
   newCommentText = '';
   routeTeam = '';
   resolutionNotes = '';
+  showReopenModal = false;
 
   availableAgents: any[] = [];
 
@@ -414,6 +501,8 @@ export class TicketDetailComponent implements OnInit {
         this.availableAgents = [
           { id: '3c8f8b88-1234-4b5b-8000-000000000002', email: 'bob@company.com', name: 'Bob (Support Agent)' },
           { id: '3c8f8b88-1234-4b5b-8000-000000000003', email: 'alice@company.com', name: 'Alice (Support Manager)' },
+          { id: '3c8f8b88-1234-4b5b-8000-000000000002', email: 'bob@company.com', name: 'Employee Bob' },
+          { id: '3c8f8b88-1234-4b5b-8000-000000000003', email: 'alice@company.com', name: 'Manager Alice' },
           { id: '3c8f8b88-1234-4b5b-8000-000000000001', email: 'admin@company.com', name: 'Admin Root' },
         ];
       }
@@ -421,6 +510,8 @@ export class TicketDetailComponent implements OnInit {
       this.availableAgents = [
         { id: '3c8f8b88-1234-4b5b-8000-000000000002', email: 'bob@company.com', name: 'Bob (Support Agent)' },
         { id: '3c8f8b88-1234-4b5b-8000-000000000003', email: 'alice@company.com', name: 'Alice (Support Manager)' },
+        { id: '3c8f8b88-1234-4b5b-8000-000000000002', email: 'bob@company.com', name: 'Employee Bob' },
+        { id: '3c8f8b88-1234-4b5b-8000-000000000003', email: 'alice@company.com', name: 'Manager Alice' },
       ];
     }
   }
@@ -499,6 +590,8 @@ export class TicketDetailComponent implements OnInit {
   async completeWork() {
     if (!this.selectedTicket) return;
     try {
+      const ticketNum = this.selectedTicket.ticket_number;
+      const ticketTitle = this.selectedTicket.title;
       const res = await this.api.post(`/api/tickets/${this.selectedTicket.id}/complete-work`, {
         notes: this.resolutionNotes || 'Operational maintenance executed and verified successfully.'
       });
@@ -507,6 +600,7 @@ export class TicketDetailComponent implements OnInit {
         alert(err.error?.message || 'Failed to complete ticket');
         return;
       }
+      this.toast.showResolved(ticketNum, ticketTitle);
       this.resolutionNotes = '';
       this.loadTicketDetails(this.selectedTicket.id);
     } catch (e: any) { alert(e.message); }
@@ -551,13 +645,53 @@ export class TicketDetailComponent implements OnInit {
     } catch (e: any) { alert(e.message); }
   }
 
-  async reopenTicket() {
+  getReopenCount(): number {
+    return this.selectedTicket?.meta_info?.reopen_count || 0;
+  }
+
+  reopenTicket() {
+    if (!this.selectedTicket) return;
+    const currentCount = this.getReopenCount();
+    if (currentCount >= 2) {
+      this.toast.show(
+        'Reopen Limit Reached',
+        `Ticket #${this.selectedTicket.ticket_number} has already reached the maximum limit of 2 reopens and cannot be reopened further.`,
+        'error',
+        this.selectedTicket.ticket_number
+      );
+      return;
+    }
+    this.showReopenModal = true;
+  }
+
+  async confirmReopen() {
+    this.showReopenModal = false;
     if (!this.selectedTicket) return;
     try {
-      const res = await this.api.patch(`/api/tickets/${this.selectedTicket.id}`, { status: 'reopened' });
+      const res = await this.api.post(`/api/tickets/${this.selectedTicket.id}/reopen`, {});
       if (!res.ok) {
         const err = await res.json();
         alert(err.error?.message || err.detail?.message || 'Failed to reopen ticket');
+        return;
+      }
+      const newCount = this.getReopenCount() + 1;
+      this.toast.show(
+        'Ticket Reopened',
+        `Ticket #${this.selectedTicket.ticket_number} reopened (Attempt ${newCount} of 2). Please cross-check ticket scope.`,
+        'warning',
+        this.selectedTicket.ticket_number
+      );
+      this.loadTicketDetails(this.selectedTicket.id);
+    } catch (e: any) { alert(e.message); }
+  }
+
+  async renewTicket() {
+    if (!this.selectedTicket) return;
+    try {
+      const res = await this.api.post(`/api/tickets/${this.selectedTicket.id}/renew`, {});
+      if (!res.ok) {
+        const err = await res.json();
+        alert(err.error?.message || err.detail?.message || 'Failed to renew and reopen archived ticket');
         return;
       }
       this.loadTicketDetails(this.selectedTicket.id);

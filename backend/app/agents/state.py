@@ -12,6 +12,7 @@ class AgentState(TypedDict):
     session_id: str
     user_id: str
     user_name: Optional[str]
+    user_role: Optional[str]  # "user", "agent" (employee), "manager", "admin"
     messages: List[Dict[str, Any]]
     current_user_message: str
 
