@@ -323,21 +323,56 @@ import { ToastService } from '../../services/toast.service';
           </div>
         </div>
 
-        <!-- Audit History Timeline -->
+        <!-- Audit History & Lifecycle Timeline -->
         <div class="timeline-section">
-          <h4 class="text-xs uppercase font-bold text-muted mb-3">Audit History & Timeline</h4>
+          <div class="flex items-center justify-between mb-4">
+            <h4 class="text-xs uppercase font-bold text-muted flex items-center gap-2" style="margin: 0;">
+              <span class="material-symbols-outlined" style="font-size: 18px; color: var(--corona-purple);">history</span>
+              <span>Audit History & Lifecycle Timeline</span>
+            </h4>
+            <span class="text-xs text-muted font-bold" *ngIf="selectedTicket.history?.length">
+              {{ selectedTicket.history.length }} Events Recorded
+            </span>
+          </div>
+
           <div class="timeline-stream">
-            <div *ngFor="let h of selectedTicket.history" class="timeline-node">
-              <div class="node-marker"></div>
-              <div class="node-content">
-                <span class="node-field">{{ h.field_name | uppercase }}:</span>
-                <span class="node-old">{{ h.old_value || 'None' }}</span>
-                <span class="material-symbols-outlined text-xs">arrow_forward</span>
-                <span class="node-new">{{ h.new_value }}</span>
-                <div class="node-time">{{ h.created_at | date:'medium' }} by {{ h.changed_by?.full_name || 'System' }}</div>
+            <div *ngFor="let h of selectedTicket.history" class="timeline-node animate-fade">
+              <!-- Node Icon Marker -->
+              <div class="node-marker" [ngClass]="getTimelineIcon(h.field_name, h.new_value).colorClass">
+                <span class="material-symbols-outlined timeline-mini-icon">{{ getTimelineIcon(h.field_name, h.new_value).icon }}</span>
+              </div>
+
+              <!-- Node Card -->
+              <div class="timeline-card">
+                <div class="timeline-card-header">
+                  <span class="timeline-field-title">{{ formatFieldName(h.field_name) }}</span>
+                  <div class="timeline-meta">
+                    <span class="timeline-time">{{ h.created_at | date:'medium' }}</span>
+                    <span class="timeline-author-badge">by {{ h.changed_by?.full_name || 'System' }}</span>
+                  </div>
+                </div>
+
+                <!-- State Transition Flow Pills -->
+                <div class="timeline-transition-row">
+                  <span class="timeline-pill pill-old">{{ formatFieldValue(h.field_name, h.old_value) }}</span>
+                  <span class="material-symbols-outlined transition-arrow">arrow_forward</span>
+                  <span class="timeline-pill" [ngClass]="getTimelinePillClass(h.field_name, h.new_value)">
+                    {{ formatFieldValue(h.field_name, h.new_value) }}
+                  </span>
+                </div>
+
+                <!-- Reason / Action Details Note -->
+                <div *ngIf="h.change_reason || h.details" class="timeline-reason-box mt-2">
+                  <span class="material-symbols-outlined reason-icon">sticky_note_2</span>
+                  <span class="reason-text">{{ h.change_reason || h.details }}</span>
+                </div>
               </div>
             </div>
-            <div *ngIf="!selectedTicket.history?.length" class="text-muted text-sm">No state transitions recorded.</div>
+
+            <div *ngIf="!selectedTicket.history?.length" class="empty-timeline-state">
+              <span class="material-symbols-outlined text-muted" style="font-size: 24px;">history_toggle_off</span>
+              <span class="text-sm text-muted">No state transitions recorded for this ticket yet.</span>
+            </div>
           </div>
         </div>
 
@@ -495,12 +530,38 @@ import { ToastService } from '../../services/toast.service';
     .btn-disabled-hint { opacity: 0.4; cursor: not-allowed; }
     .btn-sm { padding: 5px 10px; font-size: 0.75rem; }
     
-    .timeline-stream { border-left: 2px solid var(--corona-border); margin-left: 12px; padding-left: 16px; display: flex; flex-direction: column; gap: 14px; }
-    .timeline-node { position: relative; font-size: 0.82rem; }
-    .node-marker { position: absolute; left: -21px; top: 4px; width: 8px; height: 8px; border-radius: 50%; background: var(--corona-purple); box-shadow: 0 0 6px var(--corona-purple); }
-    .node-field { font-weight: 700; color: var(--text-muted); }
-    .node-new { font-weight: 700; color: var(--corona-blue); }
-    .node-time { font-size: 0.7rem; color: var(--text-dim); margin-top: 2px; }
+    .timeline-section { background: #000000; border: 1px solid var(--corona-border); border-radius: var(--radius-sm); padding: 20px; }
+    .timeline-stream { border-left: 2px solid rgba(143, 95, 232, 0.3); margin-left: 18px; padding-left: 24px; display: flex; flex-direction: column; gap: 16px; position: relative; }
+    .timeline-node { position: relative; }
+    .node-marker { position: absolute; left: -37px; top: 8px; width: 24px; height: 24px; border-radius: 50%; background: #000000; border: 2px solid var(--corona-purple); display: grid; place-items: center; box-shadow: 0 0 10px rgba(143, 95, 232, 0.3); z-index: 2; }
+    .node-marker.icon-warn { border-color: var(--corona-orange); color: var(--corona-orange); box-shadow: 0 0 10px rgba(255, 171, 0, 0.3); }
+    .node-marker.icon-success { border-color: var(--corona-green); color: var(--corona-green); box-shadow: 0 0 10px rgba(0, 210, 91, 0.3); }
+    .node-marker.icon-blue { border-color: var(--corona-blue); color: var(--corona-blue); box-shadow: 0 0 10px rgba(0, 144, 231, 0.3); }
+    .node-marker.icon-danger { border-color: var(--corona-red); color: var(--corona-red); box-shadow: 0 0 10px rgba(252, 66, 74, 0.3); }
+    .node-marker.icon-purple { border-color: var(--corona-purple); color: var(--corona-purple); }
+    .node-marker.icon-muted { border-color: var(--text-muted); color: var(--text-muted); }
+    .timeline-mini-icon { font-size: 13px; }
+
+    .timeline-card { background: var(--corona-surface); border: 1px solid var(--corona-border); border-radius: var(--radius-sm); padding: 12px 16px; }
+    .timeline-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; flex-wrap: wrap; gap: 6px; }
+    .timeline-field-title { font-size: 0.88rem; font-weight: 700; color: #ffffff; }
+    .timeline-meta { display: flex; align-items: center; gap: 8px; font-size: 0.72rem; color: var(--text-dim); }
+    .timeline-author-badge { background: rgba(255, 255, 255, 0.06); padding: 2px 6px; border-radius: 4px; color: #cbd5e1; font-weight: 600; }
+
+    .timeline-transition-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .timeline-pill { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 4px; font-size: 0.78rem; font-weight: 700; }
+    .pill-old { background: rgba(255, 255, 255, 0.05); color: #94a3b8; border: 1px solid rgba(255, 255, 255, 0.1); }
+    .pill-purple { background: rgba(143, 95, 232, 0.15); color: var(--corona-purple); border: 1px solid rgba(143, 95, 232, 0.3); }
+    .pill-success { background: rgba(0, 210, 91, 0.15); color: var(--corona-green); border: 1px solid rgba(0, 210, 91, 0.3); }
+    .pill-blue { background: rgba(0, 144, 231, 0.15); color: var(--corona-blue); border: 1px solid rgba(0, 144, 231, 0.3); }
+    .pill-warn { background: rgba(255, 171, 0, 0.15); color: var(--corona-orange); border: 1px solid rgba(255, 171, 0, 0.3); }
+    .pill-danger { background: rgba(252, 66, 74, 0.15); color: var(--corona-red); border: 1px solid rgba(252, 66, 74, 0.3); }
+    .transition-arrow { color: var(--corona-purple); font-size: 16px; font-weight: 700; }
+
+    .timeline-reason-box { display: flex; align-items: center; gap: 6px; background: rgba(0, 0, 0, 0.4); border: 1px dashed var(--corona-border); border-radius: 4px; padding: 6px 10px; font-size: 0.76rem; color: #cbd5e1; }
+    .reason-icon { font-size: 15px; color: var(--corona-purple); flex-shrink: 0; }
+    .reason-text { font-style: italic; }
+    .empty-timeline-state { display: flex; align-items: center; gap: 8px; padding: 12px 0; }
     
     .comments-list { display: flex; flex-direction: column; gap: 12px; }
     .comment-bubble { background: #000000; padding: 12px 16px; border-radius: var(--radius-sm); font-size: 0.88rem; border: 1px solid var(--corona-border); color: #ffffff; }
@@ -880,5 +941,113 @@ export class TicketDetailComponent implements OnInit {
 
   formatStatus(status: string): string {
     return status ? status.replaceAll('_', ' ') : '';
+  }
+
+  formatFieldName(field: string): string {
+    if (!field) return 'Lifecycle Event';
+    const f = field.toLowerCase();
+    if (f === 'status') return 'Status Transition';
+    if (f === 'assigned_to' || f === 'assigned_to_id') return 'Engineer Assignment';
+    if (f === 'operation_status') return 'Governance Approval';
+    if (f === 'priority') return 'Priority Update';
+    if (f === 'reopen' || f === 'reopen_ticket') return 'Ticket Reopened';
+    if (f === 'category' || f === 'category_id') return 'Category Update';
+    return f.replaceAll('_', ' ').replace(/\b\w/g, c => c.toUpperCase());
+  }
+
+  formatFieldValue(field: string, value: string): string {
+    if (!value || value === 'None' || value === 'null') return 'Initial / Unassigned';
+    
+    const f = (field || '').toLowerCase();
+    
+    // Check if it's an assignee / user UUID or email
+    if (f === 'assigned_to' || f === 'assigned_to_id') {
+      const v = value.toLowerCase();
+      if (this.selectedTicket?.assignee && (this.selectedTicket.assignee.id === value || this.selectedTicket.assignee.email === value)) {
+        return this.selectedTicket.assignee.full_name || this.selectedTicket.assignee.email;
+      }
+      const matchedAgent = this.availableAgents.find(a => a.id === value || a.email === value || (a.name && a.name.toLowerCase().includes(v)));
+      if (matchedAgent) return matchedAgent.name || matchedAgent.full_name || matchedAgent.email;
+      
+      // Known pre-seeded accounts map
+      const knownUsers: { [key: string]: string } = {
+        'eegan@company.com': 'Eegan (Employee)',
+        'hari@company.com': 'Hari (Employee)',
+        'basker@company.com': 'Basker (Employee)',
+        'adhi@company.com': 'Adhi (Admin)',
+        'giri@company.com': 'Giri (Admin)',
+        'mathan@company.com': 'Mathan (Manager)',
+      };
+      if (knownUsers[value]) return knownUsers[value];
+      if (value.length > 20) return 'Assigned Support Specialist';
+    }
+
+    if (f === 'status') {
+      const statusMap: { [key: string]: string } = {
+        'pending_admin_approval': 'Pending Admin Approval',
+        'pending_manager_routing': 'Pending Manager Routing',
+        'open': 'Open / Submitted',
+        'approved': 'Approved for Work',
+        'assigned': 'Assigned to Engineer',
+        'in_progress': 'In Progress',
+        'resolved': 'Resolved & Verified',
+        'closed': 'Closed',
+        'reopened': 'Reopened (Elevated Priority)',
+        'archived': 'Archived (2-Month Retention)',
+      };
+      return statusMap[value] || value.replaceAll('_', ' ').replace(/\b\w/g, c => c.toUpperCase());
+    }
+
+    if (f === 'operation_status') {
+      const opMap: { [key: string]: string } = {
+        'pending': 'Pending Admin Sign-off',
+        'approved': 'Restricted Operation Approved',
+        'completed': 'Maintenance Completed',
+        'rejected': 'Operation Rejected',
+      };
+      return opMap[value] || value.replaceAll('_', ' ').replace(/\b\w/g, c => c.toUpperCase());
+    }
+
+    return value.replaceAll('_', ' ').replace(/\b\w/g, c => c.toUpperCase());
+  }
+
+  getTimelineIcon(field: string, newValue: string): { icon: string; colorClass: string } {
+    const f = (field || '').toLowerCase();
+    const v = (newValue || '').toLowerCase();
+
+    if (f === 'status') {
+      if (v.includes('admin') || v.includes('pending')) return { icon: 'shield', colorClass: 'icon-warn' };
+      if (v === 'approved') return { icon: 'task_alt', colorClass: 'icon-success' };
+      if (v === 'assigned') return { icon: 'person_add', colorClass: 'icon-purple' };
+      if (v === 'in_progress') return { icon: 'engineering', colorClass: 'icon-blue' };
+      if (v === 'resolved') return { icon: 'check_circle', colorClass: 'icon-success' };
+      if (v === 'reopened') return { icon: 'replay', colorClass: 'icon-danger' };
+      if (v === 'closed') return { icon: 'lock', colorClass: 'icon-muted' };
+    }
+
+    if (f === 'assigned_to' || f === 'assigned_to_id') {
+      return { icon: 'person_add', colorClass: 'icon-purple' };
+    }
+
+    if (f === 'operation_status') {
+      return { icon: 'verified_user', colorClass: 'icon-success' };
+    }
+
+    if (f === 'priority') {
+      return { icon: 'priority_high', colorClass: 'icon-warn' };
+    }
+
+    return { icon: 'history', colorClass: 'icon-purple' };
+  }
+
+  getTimelinePillClass(field: string, newValue: string): string {
+    const f = (field || '').toLowerCase();
+    const v = (newValue || '').toLowerCase();
+
+    if (v === 'resolved' || v === 'approved' || v === 'completed') return 'pill-success';
+    if (v === 'in_progress' || v === 'assigned') return 'pill-blue';
+    if (v === 'reopened' || v === 'rejected') return 'pill-danger';
+    if (v.includes('pending') || v === 'critical' || v === 'high') return 'pill-warn';
+    return 'pill-purple';
   }
 }

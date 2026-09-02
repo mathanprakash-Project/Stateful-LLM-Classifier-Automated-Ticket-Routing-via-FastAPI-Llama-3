@@ -48,19 +48,15 @@ interface TicketSummary {
         <div class="filter-dropdowns">
           <select class="form-input" [(ngModel)]="statusFilter" (change)="loadTickets()" title="Filter by status">
             <option value="">All Statuses</option>
+            <option value="pending_admin_approval">Pending Admin Approval</option>
             <option value="open">Open</option>
+            <option value="approved">Approved</option>
             <option value="assigned">Assigned</option>
             <option value="in_progress">In Progress</option>
-            <option value="escalated">Escalated</option>
-            <option value="pending_manager_routing">Pending Routing</option>
-            <option value="pending_admin_approval">Pending Approval</option>
-            <option value="approved">Approved</option>
-            <option value="rejected">Rejected</option>
-            <option value="routed">Routed</option>
-            <option value="archived">Archived (2-Month Retention)</option>
             <option value="resolved">Resolved</option>
             <option value="closed">Closed</option>
-            <option value="cancelled">Cancelled</option>
+            <option value="reopened">Reopened</option>
+            <option value="archived">Archived (2-Month Retention)</option>
           </select>
         </div>
       </div>

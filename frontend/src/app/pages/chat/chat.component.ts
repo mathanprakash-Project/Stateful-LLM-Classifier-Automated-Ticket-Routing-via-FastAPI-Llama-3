@@ -1,8 +1,10 @@
 import { Component, OnInit, inject, ChangeDetectorRef, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { SafeHtml } from '@angular/platform-browser';
 import { ApiService } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
+import { MarkdownService } from '../../services/markdown.service';
 
 interface ChatMessage {
   role: 'user' | 'ai';
@@ -365,6 +367,7 @@ export class ChatComponent implements OnInit {
   api = inject(ApiService);
   auth = inject(AuthService);
   cdr = inject(ChangeDetectorRef);
+  markdownService = inject(MarkdownService);
 
   @ViewChild('chatScrollContainer') chatScrollContainer!: ElementRef;
 
@@ -611,14 +614,8 @@ export class ChatComponent implements OnInit {
     }, 50);
   }
 
-  renderMarkdown(text: string): string {
+  renderMarkdown(text: string): SafeHtml {
     if (!text) return '';
-    let html = text
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*(.*?)\*/g, '<em>$1</em>')
-      .replace(/`([^`]+)`/g, '<code>$1</code>')
-      .replace(/\n\n/g, '<br/><br/>')
-      .replace(/\n/g, '<br/>');
-    return html;
+    return this.markdownService.render(text);
   }
 }
