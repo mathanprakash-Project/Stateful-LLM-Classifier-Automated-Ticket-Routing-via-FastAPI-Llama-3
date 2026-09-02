@@ -1,6 +1,7 @@
 import { Component, OnInit, OnDestroy, inject, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, Router } from '@angular/router';
+import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../services/auth.service';
 import { ThemeService } from '../../services/theme.service';
 import { ToastService } from '../../services/toast.service';
@@ -14,7 +15,7 @@ interface ResolutionToast {
 @Component({
   selector: 'app-shell',
   standalone: true,
-  imports: [CommonModule, RouterModule],
+  imports: [CommonModule, RouterModule, FormsModule],
   template: `
     <div class="corona-app-shell">
       
@@ -82,55 +83,107 @@ interface ResolutionToast {
           </div>
 
           <div class="role-switch-section">
-            <span class="rs-title">Switch Demo Profile</span>
+            <div class="rs-header-row">
+              <span class="rs-title">Select Profile to Switch (Password Required)</span>
+              <div class="role-filter-pills">
+                <button type="button" class="rf-pill" [class.active-pill]="selectedRoleFilter === 'all'" (click)="selectedRoleFilter = 'all'">All (13)</button>
+                <button type="button" class="rf-pill" [class.active-pill]="selectedRoleFilter === 'manager'" (click)="selectedRoleFilter = 'manager'">Manager (1)</button>
+                <button type="button" class="rf-pill" [class.active-pill]="selectedRoleFilter === 'admin'" (click)="selectedRoleFilter = 'admin'">Admins (2)</button>
+                <button type="button" class="rf-pill" [class.active-pill]="selectedRoleFilter === 'agent'" (click)="selectedRoleFilter = 'agent'">Employees (3)</button>
+                <button type="button" class="rf-pill" [class.active-pill]="selectedRoleFilter === 'user'" (click)="selectedRoleFilter = 'user'">Users (7)</button>
+              </div>
+            </div>
+
             <div class="role-grid">
-              
-              <!-- Profile: User -->
-              <div class="role-card" [class.active-card]="auth.isUser()" (click)="switchAccount('john@company.com')">
-                <div class="role-card-top">
-                  <span class="material-symbols-outlined role-icon icon-user">person</span>
-                  <span class="role-card-badge">USER</span>
+              <div 
+                *ngFor="let p of getFilteredProfiles()" 
+                class="role-card" 
+                (click)="selectProfileToSwitch(p)"
+              >
+                <div class="role-card-header">
+                  <div class="flex items-center gap-2">
+                    <strong class="role-user-name">{{ p.name }}</strong>
+                  </div>
+                  <span class="role-card-badge" [ngClass]="p.roleClass">{{ p.role }}</span>
                 </div>
-                <strong class="role-user-name">John Doe (Customer)</strong>
-                <span class="role-user-email">john&#64;company.com</span>
-                <p class="role-desc">Can create tickets, chat with AI triage agent, confirm ticket drafts, view status, and renew archived tickets.</p>
+                <span class="role-user-email">{{ p.email }}</span>
+                <p class="role-desc">{{ p.desc }}</p>
               </div>
-
-              <!-- Profile: Employee (Agent) -->
-              <div class="role-card" [class.active-card]="auth.isEmployee()" (click)="switchAccount('bob@company.com')">
-                <div class="role-card-top">
-                  <span class="material-symbols-outlined role-icon icon-employee">engineering</span>
-                  <span class="role-card-badge">EMPLOYEE</span>
-                </div>
-                <strong class="role-user-name">Employee Bob (Support Agent)</strong>
-                <span class="role-user-email">bob&#64;company.com</span>
-                <p class="role-desc">Executes operational maintenance, starts work, resolves tickets, consults AI advisor, and adds work notes.</p>
-              </div>
-
-              <!-- Profile: Manager -->
-              <div class="role-card" [class.active-card]="auth.userRole() === 'manager'" (click)="switchAccount('alice@company.com')">
-                <div class="role-card-top">
-                  <span class="material-symbols-outlined role-icon icon-manager">alt_route</span>
-                  <span class="role-card-badge">MANAGER</span>
-                </div>
-                <strong class="role-user-name">Manager Alice (Support Lead)</strong>
-                <span class="role-user-email">alice&#64;company.com</span>
-                <p class="role-desc">Governance over tickets, routes out-of-scope requests to DB/SM teams, reopens tickets, and deletes resolved tickets.</p>
-              </div>
-
-              <!-- Profile: Admin -->
-              <div class="role-card" [class.active-card]="auth.isAdmin()" (click)="switchAccount('admin@company.com')">
-                <div class="role-card-top">
-                  <span class="material-symbols-outlined role-icon icon-admin">shield_person</span>
-                  <span class="role-card-badge">ADMIN</span>
-                </div>
-                <strong class="role-user-name">Admin Root (System Administrator)</strong>
-                <span class="role-user-email">admin&#64;company.com</span>
-                <p class="role-desc">Full governance over system, approves restricted maintenance operations, assigns agents, and manages platform.</p>
-              </div>
-
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- PASSWORD VALIDATION MODAL FOR PROFILE SWITCH -->
+      <div class="role-modal-backdrop" *ngIf="showPasswordModal" (click)="showPasswordModal = false">
+        <div class="modal-box-corona animate-pop" (click)="$event.stopPropagation()" style="max-width: 440px;">
+          <div class="role-modal-header">
+            <div class="flex items-center gap-2">
+              <span class="material-symbols-outlined text-warning" style="font-size: 20px;">lock</span>
+              <span>Validate Password to Switch</span>
+            </div>
+            <button class="icon-close-btn" (click)="showPasswordModal = false">
+              <span class="material-symbols-outlined">close</span>
+            </button>
+          </div>
+
+          <div class="role-current-box" *ngIf="targetProfile" style="margin-bottom: 16px;">
+            <span class="rc-label">Switching To Account</span>
+            <div class="rc-info">
+              <div class="rc-avatar">{{ targetProfile.name.charAt(0) }}</div>
+              <div>
+                <strong class="rc-name">{{ targetProfile.name }}</strong>
+                <div class="rc-meta">
+                  <span class="rc-email">{{ targetProfile.email }}</span>
+                  <span class="badge-role-tag" [ngClass]="targetProfile.roleClass">{{ targetProfile.role }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <form (submit)="executeSwitch($event)" class="password-form-section">
+            <p class="text-sm text-muted mb-3" style="font-size: 0.83rem; line-height: 1.4;">
+              Enter the password for <strong>{{ targetProfile?.email }}</strong> to authenticate profile access:
+            </p>
+
+            <div class="form-group mb-3">
+              <label class="form-label" style="display: block; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px;">Account Password</label>
+              <div class="search-pill" style="margin: 0; background: #000000; border: 1px solid var(--corona-border); display: flex; align-items: center; padding: 8px 12px; gap: 8px; border-radius: var(--radius-sm);">
+                <span class="material-symbols-outlined search-icon">key</span>
+                <input 
+                  [type]="showPasswordText ? 'text' : 'password'" 
+                  [(ngModel)]="switchPassword" 
+                  name="switchPassword" 
+                  placeholder="Enter password..." 
+                  class="search-input" 
+                  style="flex: 1; background: transparent; border: none; color: #ffffff; font-size: 0.88rem; outline: none;" 
+                  autofocus 
+                  required 
+                />
+                <button type="button" class="icon-btn-mini" (click)="showPasswordText = !showPasswordText" title="Toggle password visibility">
+                  <span class="material-symbols-outlined text-sm">{{ showPasswordText ? 'visibility_off' : 'visibility' }}</span>
+                </button>
+              </div>
+              <div style="margin-top: 6px; display: flex; justify-content: space-between; align-items: center;">
+                <span class="demo-hint-text">Demo password: <code>password123</code></span>
+              </div>
+            </div>
+
+            <!-- Error Banner -->
+            <div *ngIf="switchError" class="auth-error-banner animate-fade mb-3">
+              <span class="material-symbols-outlined text-sm">error</span>
+              <span>{{ switchError }}</span>
+            </div>
+
+            <div class="flex justify-end gap-2 mt-4">
+              <button type="button" class="btn-cancel" (click)="showPasswordModal = false">Cancel</button>
+              <button type="submit" class="btn-create-project" [disabled]="!switchPassword || isAuthenticating">
+                <span class="material-symbols-outlined" *ngIf="!isAuthenticating">verified_user</span>
+                <span *ngIf="isAuthenticating">Authenticating...</span>
+                <span *ngIf="!isAuthenticating">Verify & Switch</span>
+              </button>
+            </div>
+          </form>
         </div>
       </div>
 
@@ -150,7 +203,7 @@ interface ResolutionToast {
             <span>Create Ticket</span>
           </button>
 
-          <!-- User Profile Dropdown Pill -->
+          <!-- User Profile Dropdown Pill with Right Corner 3-Dots Profile Switcher -->
           <div class="corona-user-dropdown" *ngIf="auth.user() as user">
             <div class="user-avatar-wrap">
               <div class="user-avatar-circle">{{ user.name.charAt(0) }}</div>
@@ -161,6 +214,11 @@ interface ResolutionToast {
               <span class="dropdown-role-label">{{ auth.roleDisplayName() }}</span>
             </div>
             
+            <!-- 3-Dots Button for Profile Switching (Right Corner) -->
+            <button class="icon-switch-profile-btn" (click)="showRoleModal = true" title="Switch User Profile & Roles">
+              <span class="material-symbols-outlined">more_vert</span>
+            </button>
+
             <button class="logout-mini-btn" (click)="logout()" title="Logout">
               <span class="material-symbols-outlined">logout</span>
             </button>
@@ -173,7 +231,7 @@ interface ResolutionToast {
         
         <!-- CORONA SIDEBAR -->
         <aside class="corona-sidebar">
-          <!-- Top User Mini Card in Sidebar with 3-Dots Role Inspector -->
+          <!-- Top User Mini Card in Sidebar (Clean, without 3-dots) -->
           <div class="sidebar-user-card" *ngIf="auth.user() as user">
             <div class="sidebar-avatar-wrap">
               <div class="sidebar-avatar-img">{{ user.name.charAt(0) }}</div>
@@ -183,9 +241,6 @@ interface ResolutionToast {
               <span class="sidebar-name">{{ user.name }}</span>
               <span class="sidebar-role-tag">{{ auth.roleDisplayName() }}</span>
             </div>
-            <button class="sidebar-dots-btn" (click)="showRoleModal = true" title="View Roles & User Types">
-              <span class="material-symbols-outlined">more_vert</span>
-            </button>
           </div>
 
           <!-- Section Label: Navigation -->
@@ -197,6 +252,13 @@ interface ResolutionToast {
                 <span class="material-symbols-outlined">speed</span>
               </div>
               <span class="nav-label">Dashboard</span>
+            </a>
+
+            <a routerLink="/ticket-status" routerLinkActive="active" class="corona-nav-item">
+              <div class="nav-icon-circle icon-cyan">
+                <span class="material-symbols-outlined">track_changes</span>
+              </div>
+              <span class="nav-label">Ticket Status</span>
             </a>
 
             <a routerLink="/tickets" routerLinkActive="active" class="corona-nav-item">
@@ -211,7 +273,7 @@ interface ResolutionToast {
                 <span class="material-symbols-outlined">smart_toy</span>
               </div>
               <span class="nav-label">AI Assistant</span>
-              <span class="nav-pill-badge">GPT 120B</span>
+              <span class="nav-pill-badge">{{ getActiveModelName() }}</span>
             </a>
           </nav>
 
@@ -224,6 +286,42 @@ interface ResolutionToast {
             </div>
           </div>
         </aside>
+
+        <!-- PROACTIVE RESOLVED TICKET NOTIFICATION POPUP MODAL (For User login) -->
+        <div class="role-modal-backdrop" *ngIf="resolvedNotificationTicket" (click)="dismissResolvedPopup()">
+          <div class="role-modal-card animate-pop" (click)="$event.stopPropagation()" style="max-width: 480px;">
+            <div class="role-modal-header" style="border-bottom: 1px solid rgba(0, 210, 91, 0.2);">
+              <div class="role-modal-title flex items-center gap-2">
+                <span class="material-symbols-outlined text-green" style="font-size: 24px;">task_alt</span>
+                <span style="color: var(--corona-green);">Ticket Resolved!</span>
+              </div>
+              <button class="icon-close-btn" (click)="dismissResolvedPopup()">
+                <span class="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            <div style="padding: 16px 0;">
+              <p style="font-size: 0.9rem; color: #ffffff; margin: 0 0 12px 0; line-height: 1.5;">
+                Your maintenance request has been successfully completed and resolved by the support team.
+              </p>
+              <div style="background: #000000; border: 1px solid var(--corona-border); border-radius: var(--radius-sm); padding: 12px; margin-bottom: 12px;">
+                <div style="font-size: 0.75rem; color: var(--corona-purple); font-weight: 700;">{{ resolvedNotificationTicket.ticket_number }}</div>
+                <div style="font-size: 0.95rem; font-weight: 700; color: #ffffff; margin: 2px 0;">{{ resolvedNotificationTicket.title }}</div>
+                <div style="font-size: 0.78rem; color: var(--text-muted);">Category: {{ resolvedNotificationTicket.category_name || resolvedNotificationTicket.category?.name || 'Application Support' }}</div>
+              </div>
+              <p style="font-size: 0.78rem; color: var(--text-muted); margin: 0;">
+                You can review the completion verification, close the ticket, or reopen if further maintenance is required.
+              </p>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-3 border-t" style="border-color: var(--corona-border);">
+              <button class="btn-cancel" (click)="dismissResolvedPopup()">Dismiss</button>
+              <button class="btn-create-project" (click)="viewResolvedTicket(resolvedNotificationTicket.id)">
+                <span class="material-symbols-outlined">visibility</span> Inspect Ticket
+              </button>
+            </div>
+          </div>
+        </div>
 
         <!-- MAIN VIEW AREA -->
         <main class="corona-content">
@@ -362,6 +460,22 @@ interface ResolutionToast {
       color: var(--corona-green);
       font-weight: 700;
       letter-spacing: 0.04em;
+    }
+
+    .icon-switch-profile-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+      padding: 6px;
+      border-radius: 4px;
+      transition: var(--transition);
+    }
+    .icon-switch-profile-btn:hover {
+      background: rgba(255, 255, 255, 0.08);
+      color: #ffffff;
     }
 
     .logout-mini-btn {
@@ -516,6 +630,7 @@ interface ResolutionToast {
       font-size: 18px;
     }
     .icon-purple { background-color: var(--corona-purple-bg); color: var(--corona-purple); }
+    .icon-cyan { background-color: rgba(0, 210, 91, 0.15); color: var(--corona-green); }
     .icon-orange { background-color: var(--corona-orange-bg); color: var(--corona-orange); }
     .icon-blue { background-color: var(--corona-blue-bg); color: var(--corona-blue); }
 
@@ -741,8 +856,10 @@ interface ResolutionToast {
       background: var(--corona-surface);
       border: 1px solid var(--corona-border);
       border-radius: var(--radius-sm);
-      width: 90%;
-      max-width: 680px;
+      width: 92%;
+      max-width: 860px;
+      max-height: 88vh;
+      overflow-y: auto;
       padding: 24px;
       color: #ffffff;
       box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8);
@@ -782,10 +899,6 @@ interface ResolutionToast {
       border-radius: var(--radius-sm);
       padding: 14px 18px;
       margin-bottom: 20px;
-    }
-    .rc-label {
-      font-size: 0.7rem;
-      font-weight: 700;
       text-transform: uppercase;
       color: var(--text-muted);
       display: block;
@@ -828,59 +941,87 @@ interface ResolutionToast {
     .role-admin { background: rgba(143, 95, 232, 0.15); color: var(--corona-purple); }
 
     .role-switch-section { margin-top: 14px; }
+    .rs-header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
     .rs-title {
       font-size: 0.75rem;
       font-weight: 700;
       text-transform: uppercase;
       color: var(--text-muted);
       display: block;
-      margin-bottom: 12px;
+      margin: 0;
+    }
+
+    .role-filter-pills {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .rf-pill {
+      background: #000000;
+      border: 1px solid var(--corona-border);
+      color: var(--text-muted);
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 20px;
+      cursor: pointer;
+      transition: var(--transition);
+    }
+    .rf-pill:hover {
+      border-color: var(--corona-purple);
+      color: #ffffff;
+    }
+    .rf-pill.active-pill {
+      background: var(--corona-purple);
+      border-color: var(--corona-purple);
+      color: #ffffff;
     }
 
     .role-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 14px;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 12px;
+      max-height: 380px;
+      overflow-y: auto;
+      padding-right: 4px;
     }
 
     .role-card {
       background: #000000;
       border: 1px solid var(--corona-border);
       border-radius: var(--radius-sm);
-      padding: 16px;
+      padding: 14px;
       cursor: pointer;
-      transition: var(--transition);
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 4px;
+      transition: var(--transition);
     }
     .role-card:hover {
       border-color: var(--corona-purple);
-      background: rgba(143, 95, 232, 0.04);
-      transform: translateY(-2px);
-    }
-    .role-card.active-card {
-      border-color: var(--corona-green);
-      background: rgba(0, 210, 91, 0.05);
-      box-shadow: 0 0 12px rgba(0, 210, 91, 0.15);
+      background: rgba(143, 95, 232, 0.05);
+      transform: translateY(-1px);
     }
 
-    .role-card-top {
+    .role-card-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 4px;
+      gap: 8px;
     }
-    .role-icon { font-size: 24px; }
-    .icon-user { color: var(--corona-green); }
-    .icon-employee { color: var(--corona-blue); }
-    .icon-manager { color: var(--corona-orange); }
-    .icon-admin { color: var(--corona-purple); }
 
     .role-card-badge {
-      font-size: 0.65rem;
-      font-weight: 800;
-      background: rgba(255, 255, 255, 0.08);
+      font-size: 0.7rem;
+      font-weight: 700;
       padding: 2px 6px;
       border-radius: 4px;
       color: #ffffff;
@@ -895,10 +1036,60 @@ interface ResolutionToast {
       line-height: 1.4;
     }
 
+    .btn-cancel {
+      background: transparent;
+      border: 1px solid var(--corona-border);
+      color: var(--text-muted);
+      font-weight: 600;
+      font-size: 0.82rem;
+      padding: 8px 16px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: var(--transition);
+    }
+    .btn-cancel:hover { background: rgba(255, 255, 255, 0.05); color: #ffffff; }
+
+    .icon-btn-mini {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+      padding: 2px;
+    }
+    .icon-btn-mini:hover { color: #ffffff; }
+    .demo-hint-text {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+    }
+    .demo-hint-text code {
+      background: #000000;
+      border: 1px solid var(--corona-border);
+      padding: 1px 4px;
+      border-radius: 3px;
+      color: var(--corona-purple);
+    }
+
+    .auth-error-banner {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: rgba(252, 66, 74, 0.12);
+      border: 1px solid var(--corona-red);
+      border-radius: var(--radius-sm);
+      font-size: 0.8rem;
+      color: var(--corona-red);
+      font-weight: 600;
+    }
+
     .animate-pop { animation: popIn 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
     .animate-toast { animation: toastIn 0.3s ease-out; }
+    .animate-fade { animation: fadeIn 0.2s ease-out; }
     @keyframes popIn { from { opacity: 0; transform: scale(0.94); } to { opacity: 1; transform: scale(1); } }
     @keyframes toastIn { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: translateX(0); } }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
   `]
 })
 export class ShellComponent implements OnInit, OnDestroy {
@@ -911,11 +1102,95 @@ export class ShellComponent implements OnInit, OnDestroy {
   sseConnected = false;
   isLoading = false;
   showRoleModal = false;
+  showPasswordModal = false;
+  targetProfile: any = null;
+  switchPassword = '';
+  switchError = '';
+  showPasswordText = false;
+  isAuthenticating = false;
+
+  selectedRoleFilter: string = 'all';
+
+  availableProfiles = [
+    // 1 Manager
+    { name: 'Mathan', email: 'mathan@company.com', role: 'MANAGER', roleType: 'manager', icon: 'alt_route', roleClass: 'role-manager', desc: 'Governance over tickets, routes out-of-scope requests to DB/SM teams, reopens tickets, and deletes resolved tickets.' },
+
+    // 2 Admins
+    { name: 'Adhi', email: 'adhi@company.com', role: 'ADMIN', roleType: 'admin', icon: 'shield_person', roleClass: 'role-admin', desc: 'Full governance over system, approves restricted maintenance operations, assigns agents, and manages platform.' },
+    { name: 'Giri', email: 'giri@company.com', role: 'ADMIN', roleType: 'admin', icon: 'shield_person', roleClass: 'role-admin', desc: 'System Administrator with operations oversight, approvals, and user governance.' },
+
+    // 3 Employees
+    { name: 'Eegan', email: 'eegan@company.com', role: 'EMPLOYEE', roleType: 'agent', icon: 'engineering', roleClass: 'role-employee', desc: 'Executes operational maintenance, starts work, resolves tickets, consults AI advisor, and adds work notes.' },
+    { name: 'Hari', email: 'hari@company.com', role: 'EMPLOYEE', roleType: 'agent', icon: 'engineering', roleClass: 'role-employee', desc: 'Support Agent executing operational tasks, progress updates, and completion notes.' },
+    { name: 'Basker', email: 'basker@company.com', role: 'EMPLOYEE', roleType: 'agent', icon: 'engineering', roleClass: 'role-employee', desc: 'Support Agent specialized in execution, verification, and resolution.' },
+
+    // 7 Users
+    { name: 'Venu', email: 'venu@company.com', role: 'USER', roleType: 'user', icon: 'person', roleClass: 'role-user', desc: 'Can create tickets, chat with AI triage agent, confirm ticket drafts, view status, and renew archived tickets.' },
+    { name: 'Santhosh', email: 'santhosh@company.com', role: 'USER', roleType: 'user', icon: 'person', roleClass: 'role-user', desc: 'Submits application tickets, triage interaction, and status tracking.' },
+    { name: 'Harsh', email: 'harsh@company.com', role: 'USER', roleType: 'user', icon: 'person', roleClass: 'role-user', desc: 'Submits maintenance requests, verifies activity, and communicates with agents.' },
+    { name: 'Kasi', email: 'kasi@company.com', role: 'USER', roleType: 'user', icon: 'person', roleClass: 'role-user', desc: 'Creates tickets, checks resolutions, and renews archived requests.' },
+    { name: 'Deepesh', email: 'deepesh@company.com', role: 'USER', roleType: 'user', icon: 'person', roleClass: 'role-user', desc: 'Submits support requests, reviews AI suggestions, and confirms drafts.' },
+    { name: 'Manoj', email: 'manoj@company.com', role: 'USER', roleType: 'user', icon: 'person', roleClass: 'role-user', desc: 'Submits tickets and tracks progress across application queues.' },
+    { name: 'Priya', email: 'priya@company.com', role: 'USER', roleType: 'user', icon: 'person', roleClass: 'role-user', desc: 'Creates requests and verifies operational maintenance resolutions.' },
+  ];
+
+  getFilteredProfiles() {
+    if (this.selectedRoleFilter === 'all') return this.availableProfiles;
+    return this.availableProfiles.filter(p => p.roleType === this.selectedRoleFilter);
+  }
+
   private eventSource: EventSource | null = null;
+  resolvedNotificationTicket: any = null;
+
+  getActiveModelName(): string {
+    const m = localStorage.getItem('preferred_ai_model');
+    if (m === 'gpt-oss:120b-cloud') return 'GPT 120B';
+    if (m === 'llama3.2:3b') return 'Llama 3.2';
+    return 'Llama 3.2';
+  }
 
   ngOnInit() {
     this.initSSE();
     this.triggerLoadingAnimation();
+    this.checkUserResolvedTickets();
+  }
+
+  async checkUserResolvedTickets() {
+    if (!this.auth.isUser()) return;
+    try {
+      const res = await fetch('/api/tickets?status=resolved', {
+        headers: {
+          'Authorization': `Bearer ${this.auth.token()}`
+        }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const tickets = Array.isArray(data) ? data : (data.items || []);
+        for (const t of tickets) {
+          const key = `notified_resolved_toast_${t.id}`;
+          if (!localStorage.getItem(key)) {
+            // Proactive one-time top-right toast on first login
+            this.toastService.showResolved(t.ticket_number, t.title);
+            localStorage.setItem(key, 'true');
+            this.cdr.detectChanges();
+            break;
+          }
+        }
+      }
+    } catch (e) {}
+  }
+
+  dismissResolvedPopup() {
+    if (this.resolvedNotificationTicket) {
+      localStorage.setItem(`dismissed_resolved_popup_${this.resolvedNotificationTicket.id}`, 'true');
+      this.resolvedNotificationTicket = null;
+      this.cdr.detectChanges();
+    }
+  }
+
+  viewResolvedTicket(id: string) {
+    this.dismissResolvedPopup();
+    this.router.navigate([`/tickets/${id}`]);
   }
 
   ngOnDestroy() {
@@ -938,17 +1213,42 @@ export class ShellComponent implements OnInit, OnDestroy {
     this.router.navigate(['/tickets'], { queryParams: { create: true } });
   }
 
-  async switchAccount(email: string) {
+  selectProfileToSwitch(profile: any) {
+    this.targetProfile = profile;
+    this.switchPassword = '';
+    this.switchError = '';
+    this.showPasswordText = false;
     this.showRoleModal = false;
-    this.isLoading = true;
+    this.showPasswordModal = true;
+  }
+
+  async executeSwitch(event?: Event) {
+    if (event) event.preventDefault();
+    if (!this.targetProfile || !this.switchPassword || this.isAuthenticating) return;
+
+    this.isAuthenticating = true;
+    this.switchError = '';
     this.cdr.detectChanges();
 
-    await this.auth.login(email, 'password123');
-    setTimeout(() => {
-      this.isLoading = false;
+    const res = await this.auth.login(this.targetProfile.email, this.switchPassword);
+    this.isAuthenticating = false;
+
+    if (!res.success) {
+      this.switchError = res.error || 'Invalid password. Please verify credentials and try again.';
       this.cdr.detectChanges();
-      this.router.navigate(['/dashboard']);
-    }, 500);
+      return;
+    }
+
+    this.showPasswordModal = false;
+    this.switchPassword = '';
+    this.toastService.show(
+      'Profile Switched',
+      `Authenticated successfully as ${this.targetProfile.name}`,
+      'success'
+    );
+    this.triggerLoadingAnimation();
+    this.checkUserResolvedTickets();
+    this.router.navigate(['/dashboard']);
   }
 
   private initSSE() {
@@ -967,6 +1267,7 @@ export class ShellComponent implements OnInit, OnDestroy {
           const data = JSON.parse(event.data);
           if (data.status === 'resolved') {
             this.toastService.showResolved(data.ticket_number || 'TKT', data.title || 'Support ticket resolved');
+            this.checkUserResolvedTickets();
           }
         } catch (e) {}
       });
@@ -974,6 +1275,7 @@ export class ShellComponent implements OnInit, OnDestroy {
         try {
           const data = JSON.parse(event.data);
           this.toastService.showResolved(data.ticket_number || 'TKT', data.title || 'Support ticket resolved');
+          this.checkUserResolvedTickets();
         } catch (e) {}
       });
     } catch (e) { console.error(e); }

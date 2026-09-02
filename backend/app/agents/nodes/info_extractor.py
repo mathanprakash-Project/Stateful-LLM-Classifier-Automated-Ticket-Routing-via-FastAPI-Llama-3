@@ -66,14 +66,14 @@ def rule_based_extraction_fallback(text: str, current_fields: Dict[str, Any], hi
         extracted["category"] = "Application Support"
         extracted["subcategory"] = "General Inquiry"
 
-    # Priority heuristic
-    if any(w in full_lower for w in ["urgent", "critical", "outage", "blocker", "emergency"]):
+    # Priority heuristic (Only extract if explicitly stated by user, otherwise defer to activity execution mode default)
+    if any(w in full_lower for w in ["priority critical", "priority: critical", "priority is critical", "priority=critical"]):
         extracted["priority"] = "critical"
-    elif any(w in full_lower for w in ["high priority", "asap", "can't work", "cannot work", "deadline", "unstable", "completely blocks"]):
+    elif any(w in full_lower for w in ["priority high", "priority: high", "priority is high", "priority=high"]):
         extracted["priority"] = "high"
-    elif any(w in full_lower for w in ["low priority", "minor", "whenever"]):
+    elif any(w in full_lower for w in ["priority low", "priority: low", "priority is low", "priority=low"]):
         extracted["priority"] = "low"
-    elif "priority" not in extracted:
+    elif any(w in full_lower for w in ["priority medium", "priority: medium", "priority is medium", "priority=medium"]):
         extracted["priority"] = "medium"
 
     # Metadata heuristics

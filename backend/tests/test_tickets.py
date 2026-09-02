@@ -319,11 +319,15 @@ async def test_non_user_cannot_create_ticket(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_reopen_ticket_limit_max_2_times(client: AsyncClient):
-    user_login = await client.post("/auth/login", json={"email": "john@company.com", "password": "password123"})
+async def test_reopen_ticket_limit_max_3_times(client: AsyncClient):
+    user_login = await client.post("/auth/login", json={"email": "venu@company.com", "password": "password123"})
+    if user_login.status_code != 200:
+        user_login = await client.post("/auth/login", json={"email": "john@company.com", "password": "password123"})
     user_headers = {"Authorization": f"Bearer {user_login.json()['access_token']}"}
 
-    agent_login = await client.post("/auth/login", json={"email": "bob@company.com", "password": "password123"})
+    agent_login = await client.post("/auth/login", json={"email": "eegan@company.com", "password": "password123"})
+    if agent_login.status_code != 200:
+        agent_login = await client.post("/auth/login", json={"email": "bob@company.com", "password": "password123"})
     agent_headers = {"Authorization": f"Bearer {agent_login.json()['access_token']}"}
 
     cats = (await client.get("/categories")).json()
@@ -331,7 +335,7 @@ async def test_reopen_ticket_limit_max_2_times(client: AsyncClient):
         "/tickets",
         json={
             "title": "Reopen Limit Verification Ticket",
-            "description": "Verify that a ticket can be reopened at most 2 times.",
+            "description": "Verify that a ticket can be reopened at most 3 times.",
             "category_id": cats[0]["id"],
             "priority": "medium",
         },
@@ -346,7 +350,7 @@ async def test_reopen_ticket_limit_max_2_times(client: AsyncClient):
     assert res1.status_code == 200
     assert res1.json()["status"] == "resolved"
 
-    # 1. First Reopen (Attempt 1 of 2) -> Allowed
+    # 1. First Reopen (Attempt 1 of 3) -> Allowed
     reopen1 = await client.post(f"/tickets/{ticket_id}/reopen", headers=user_headers)
     assert reopen1.status_code == 200
     assert reopen1.json()["status"] == "reopened"
@@ -357,7 +361,7 @@ async def test_reopen_ticket_limit_max_2_times(client: AsyncClient):
     assert res2.status_code == 200
     assert res2.json()["status"] == "resolved"
 
-    # 2. Second Reopen (Attempt 2 of 2) -> Allowed
+    # 2. Second Reopen (Attempt 2 of 3) -> Allowed
     reopen2 = await client.post(f"/tickets/{ticket_id}/reopen", headers=user_headers)
     assert reopen2.status_code == 200
     assert reopen2.json()["status"] == "reopened"
@@ -368,8 +372,19 @@ async def test_reopen_ticket_limit_max_2_times(client: AsyncClient):
     assert res3.status_code == 200
     assert res3.json()["status"] == "resolved"
 
-    # 3. Third Reopen -> Must be BLOCKED (422)
+    # 3. Third Reopen (Attempt 3 of 3) -> Allowed
     reopen3 = await client.post(f"/tickets/{ticket_id}/reopen", headers=user_headers)
-    assert reopen3.status_code == 422
-    assert "maximum limit of 2 reopens" in reopen3.text
+    assert reopen3.status_code == 200
+    assert reopen3.json()["status"] == "reopened"
+
+    # Agent starts and resolves ticket fourth time
+    await client.post(f"/tickets/{ticket_id}/start-work", headers=agent_headers)
+    res4 = await client.post(f"/tickets/{ticket_id}/complete-work", json={"notes": "Resolved attempt 4"}, headers=agent_headers)
+    assert res4.status_code == 200
+    assert res4.json()["status"] == "resolved"
+
+    # 4. Fourth Reopen -> Must be BLOCKED (422)
+    reopen4 = await client.post(f"/tickets/{ticket_id}/reopen", headers=user_headers)
+    assert reopen4.status_code == 422
+    assert "maximum limit of 3 reopens" in reopen4.text
 

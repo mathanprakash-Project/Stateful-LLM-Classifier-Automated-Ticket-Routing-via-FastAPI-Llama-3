@@ -30,7 +30,7 @@ services:
       DATABASE_URL: postgresql+asyncpg://postgres:postgrespassword@postgres:5432/ticket_system
       SECRET_KEY: super-secret-key-change-in-production-ticket-system-2026
       OLLAMA_BASE_URL: http://host.docker.internal:11434
-      DEFAULT_MODEL: gpt-oss:120b-cloud
+      DEFAULT_MODEL: llama3.2:3b
       LLM_PROVIDER: ollama
     ports:
       - "8000:8000"

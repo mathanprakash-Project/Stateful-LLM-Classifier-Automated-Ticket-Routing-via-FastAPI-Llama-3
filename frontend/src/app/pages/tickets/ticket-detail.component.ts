@@ -24,8 +24,8 @@ import { ToastService } from '../../services/toast.service';
           </div>
         </div>
         <div class="flex items-center gap-2">
-          <!-- Close button for resolved ticket -->
-          <button *ngIf="selectedTicket.status === 'resolved'" class="btn btn-sm btn-primary" (click)="closeTicket()" title="Close Ticket">
+          <!-- Close button for resolved ticket (Requester User, Manager, Admin only; Employees cannot close) -->
+          <button *ngIf="selectedTicket.status === 'resolved' && !isAgentOnly()" class="btn btn-sm btn-primary" (click)="closeTicket()" title="Close Ticket">
             <span class="material-symbols-outlined">lock</span>
             <span>Close Ticket</span>
           </button>
@@ -53,6 +53,61 @@ import { ToastService } from '../../services/toast.service';
           Category: <strong class="text-main">{{ selectedTicket.category?.name || 'General' }}</strong> • 
           Created by: <strong class="text-main">{{ selectedTicket.creator?.full_name || 'User' }}</strong> • 
           Current Assignee: <strong class="text-main">{{ selectedTicket.assignee?.full_name || 'Unassigned' }}</strong>
+        </div>
+
+        <!-- WORKFLOW PROCESS STEPPER -->
+        <div class="workflow-stepper mb-5 p-3 rounded animate-fade" style="background: #000000; border: 1px solid var(--corona-border);">
+          <div class="flex justify-between items-center text-xs font-bold text-muted mb-2">
+            <span>Workflow Process Lifecycle</span>
+            <span class="text-white font-semibold">Current: {{ getProcessStageLabel(selectedTicket.status) }}</span>
+          </div>
+          <div class="flex items-center gap-1 w-full">
+            <div class="flex-1 py-1 px-2 rounded text-center text-xs font-semibold"
+                 [style.background]="isStepActiveOrCompleted(1) ? 'rgba(110, 86, 207, 0.25)' : 'rgba(255,255,255,0.05)'"
+                 [style.color]="isStepActiveOrCompleted(1) ? 'var(--corona-purple)' : 'var(--text-muted)'"
+                 [style.border]="isStepCurrent(1) ? '1px solid var(--corona-purple)' : '1px solid transparent'">
+              1. Submission
+            </div>
+            <span class="material-symbols-outlined text-muted" style="font-size: 14px;">chevron_right</span>
+            <div class="flex-1 py-1 px-2 rounded text-center text-xs font-semibold"
+                 [style.background]="isStepActiveOrCompleted(2) ? 'rgba(0, 144, 231, 0.25)' : 'rgba(255,255,255,0.05)'"
+                 [style.color]="isStepActiveOrCompleted(2) ? 'var(--corona-blue)' : 'var(--text-muted)'"
+                 [style.border]="isStepCurrent(2) ? '1px solid var(--corona-blue)' : '1px solid transparent'">
+              2. Assignment
+            </div>
+            <span class="material-symbols-outlined text-muted" style="font-size: 14px;">chevron_right</span>
+            <div class="flex-1 py-1 px-2 rounded text-center text-xs font-semibold"
+                 [style.background]="isStepActiveOrCompleted(3) ? 'rgba(255, 171, 0, 0.25)' : 'rgba(255,255,255,0.05)'"
+                 [style.color]="isStepActiveOrCompleted(3) ? 'var(--corona-orange)' : 'var(--text-muted)'"
+                 [style.border]="isStepCurrent(3) ? '1px solid var(--corona-orange)' : '1px solid transparent'">
+              3. Execution
+            </div>
+            <span class="material-symbols-outlined text-muted" style="font-size: 14px;">chevron_right</span>
+            <div class="flex-1 py-1 px-2 rounded text-center text-xs font-semibold"
+                 [style.background]="isStepActiveOrCompleted(4) ? 'rgba(0, 210, 91, 0.25)' : 'rgba(255,255,255,0.05)'"
+                 [style.color]="isStepActiveOrCompleted(4) ? 'var(--corona-green)' : 'var(--text-muted)'"
+                 [style.border]="isStepCurrent(4) ? '1px solid var(--corona-green)' : '1px solid transparent'">
+              4. Resolved
+            </div>
+          </div>
+        </div>
+
+        <!-- RESOLVED CUSTOMER NOTICE BANNER -->
+        <div *ngIf="selectedTicket.status === 'resolved'" class="mb-5 p-4 animate-fade" style="background: rgba(0, 210, 91, 0.12); border: 1px solid var(--corona-green); border-radius: var(--radius-sm);">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="material-symbols-outlined text-green" style="font-size: 26px; color: var(--corona-green);">task_alt</span>
+              <div>
+                <h4 style="color: var(--corona-green); font-size: 0.95rem; margin: 0; font-weight: 700;">Ticket Resolved & Verified by Support</h4>
+                <p class="text-xs text-white mt-1 mb-0">The requested maintenance activity has been completed. You can verify the outcome and close this ticket or reopen if further action is needed.</p>
+              </div>
+            </div>
+            <div *ngIf="auth.isUser() || isManager()" class="flex gap-2">
+              <button class="btn btn-sm btn-success" (click)="closeTicket()">
+                <span class="material-symbols-outlined text-xs">check</span> Close Ticket
+              </button>
+            </div>
+          </div>
         </div>
 
         <!-- Operational Maintenance Metadata Banner -->
@@ -105,10 +160,24 @@ import { ToastService } from '../../services/toast.service';
 
         <!-- ROLE ACTION PANELS -->
 
+        <!-- REOPENED ELEVATED PRIORITY ALERT BANNER -->
+        <div *ngIf="selectedTicket.status === 'reopened'" class="mb-5 p-3 animate-fade" style="background: rgba(255, 61, 0, 0.12); border: 1px solid var(--corona-red); border-radius: var(--radius-sm);">
+          <div class="flex items-center gap-2 mb-1" style="color: var(--corona-red); font-weight: 700; font-size: 0.95rem;">
+            <span class="material-symbols-outlined" style="font-size: 22px;">priority_high</span>
+            ⚡ High Priority Alert: Customer Reopened Ticket (Attempt {{ getReopenCount() }}/3)
+          </div>
+          <p class="text-sm text-white mb-2" style="line-height: 1.4;">
+            <strong>Elevated Priority Notice:</strong> Reopened tickets have high priority. Please review the customer's stated reason below, cross-check all previous activity logs, and resolve with urgency.
+          </p>
+          <div *ngIf="getLatestReopenReason()" class="p-2 rounded text-sm" style="background: rgba(0, 0, 0, 0.3); border-left: 3px solid var(--corona-red); color: #e2e8f0;">
+            <strong style="color: var(--corona-orange);">Customer's Reason for Reopening:</strong>
+            <div class="mt-1 italic">"{{ getLatestReopenReason() }}"</div>
+          </div>
+        </div>
+
         <!-- 1. ADMIN ACTIONS -->
         <div class="admin-action-panel mb-6 animate-fade" *ngIf="isAdmin() && selectedTicket.status === 'pending_admin_approval'">
           <h4 class="form-label text-warning"><span class="material-symbols-outlined">shield</span> Admin Governance: Review Restricted Operation</h4>
-          <p class="text-sm text-muted mb-3">This high-impact operation requires Administrator sign-off. Once approved, assign an Agent (Employee) to execute the work.</p>
           <p class="text-sm text-muted mb-3">This high-impact operation requires Administrator sign-off. Once approved, assign an Employee to execute the work.</p>
           <div class="flex gap-2">
             <button class="btn btn-success" (click)="approveOperation()"><span class="material-symbols-outlined">check_circle</span> Approve Operation</button>
@@ -116,15 +185,12 @@ import { ToastService } from '../../services/toast.service';
           </div>
         </div>
 
-        <!-- 2. ADMIN ASSIGNMENT PANEL (For approved tickets or open tickets) -->
-        <div class="admin-action-panel mb-6 animate-fade" *ngIf="isAdmin() && selectedTicket.status === 'approved'">
-          <h4 class="form-label text-success"><span class="material-symbols-outlined">verified</span> Approved — Ready for Agent Assignment</h4>
-          <p class="text-sm text-muted mb-3">Assign this approved maintenance ticket to an Agent (Employee) to perform and complete the activity.</p>
-          <h4 class="form-label text-success"><span class="material-symbols-outlined">verified</span> Approved — Ready for Employee Assignment</h4>
-          <p class="text-sm text-muted mb-3">Assign this approved maintenance ticket to an Employee to perform and complete the activity.</p>
+        <!-- 2. ADMIN ASSIGNMENT PANEL (For approved tickets, open tickets, or reopened tickets) -->
+        <div class="admin-action-panel mb-6 animate-fade" *ngIf="isAdmin() && (selectedTicket.status === 'approved' || selectedTicket.status === 'open' || selectedTicket.status === 'reopened')">
+          <h4 class="form-label text-success"><span class="material-symbols-outlined">verified</span> Ready for Employee Assignment</h4>
+          <p class="text-sm text-muted mb-3">Assign this maintenance ticket to an Employee to perform and complete the activity.</p>
           <div class="flex gap-2 items-center">
             <select class="form-select flex-1" [(ngModel)]="targetAssigneeEmail">
-              <option value="">-- Select Agent (Employee) --</option>
               <option value="">-- Select Employee --</option>
               <option *ngFor="let u of availableAgents" [value]="u.id">
                 {{ u.name }} ({{ u.email }})
@@ -173,7 +239,7 @@ import { ToastService } from '../../services/toast.service';
 
         <!-- 4. EMPLOYEE EXECUTION CONTROLS -->
         <div class="admin-action-panel mb-6 animate-fade" *ngIf="isAgentOrStaff() && (selectedTicket.status === 'open' || selectedTicket.status === 'assigned' || selectedTicket.status === 'approved' || selectedTicket.status === 'reopened')">
-          <h4 class="form-label text-accent"><span class="material-symbols-outlined">engineering</span> Employee Execution Panel <span *ngIf="selectedTicket.status === 'reopened'" class="badge-role-tag role-manager" style="margin-left: 8px;">Reopened Activity ({{ getReopenCount() }}/2)</span></h4>
+          <h4 class="form-label text-accent"><span class="material-symbols-outlined">engineering</span> Employee Execution Panel <span *ngIf="selectedTicket.status === 'reopened'" class="badge-role-tag role-manager" style="margin-left: 8px;">Reopened Activity ({{ getReopenCount() }}/3)</span></h4>
           <p class="text-sm text-muted mb-3">Pick up this maintenance activity to start work and progress it through execution.</p>
           <button class="btn btn-primary" (click)="startWork()">
             <span class="material-symbols-outlined">play_arrow</span> Start Work (In Progress)
@@ -197,21 +263,26 @@ import { ToastService } from '../../services/toast.service';
         <div class="admin-action-panel mb-6 animate-fade" *ngIf="selectedTicket.status === 'resolved'">
           <h4 class="form-label text-success flex items-center gap-2">
             <span class="material-symbols-outlined">task_alt</span> Operational Activity Resolved
-            <span *ngIf="getReopenCount() > 0" class="badge-role-tag role-manager" style="margin-left: 8px;">Reopened {{ getReopenCount() }}/2 times</span>
+            <span *ngIf="getReopenCount() > 0" class="badge-role-tag role-manager" style="margin-left: 8px;">Reopened {{ getReopenCount() }}/3 times</span>
           </h4>
-          <p class="text-sm text-muted mb-3">This maintenance activity has been completed and verified. You can permanently close the ticket or, as a Manager, delete it.</p>
+          <p class="text-sm text-muted mb-3">This maintenance activity has been completed and verified. Employees can see that the ticket is resolved, while Requesters and Managers can close or reopen it.</p>
           <div class="flex gap-2 items-center flex-wrap">
-            <button class="btn btn-primary" (click)="closeTicket()">
+            <!-- Close Ticket only for Requester User, Manager, Admin -->
+            <button *ngIf="!isAgentOnly()" class="btn btn-primary" (click)="closeTicket()">
               <span class="material-symbols-outlined">lock</span> Close Ticket
             </button>
+            <!-- Employee Resolved Info View -->
+            <div *ngIf="isAgentOnly()" class="text-sm text-success flex items-center gap-1 font-semibold">
+              <span class="material-symbols-outlined">check_circle</span> Activity completed and marked as Resolved.
+            </div>
             <button *ngIf="isManagerOrAdmin()" class="btn btn-danger" (click)="deleteTicket()" title="Permanently Delete Ticket">
               <span class="material-symbols-outlined">delete</span> Delete Ticket (Manager)
             </button>
-            <button *ngIf="getReopenCount() < 2" class="btn btn-outlined" (click)="reopenTicket()" title="Reopen Ticket (Attempt {{ getReopenCount() + 1 }} of 2)">
-              <span class="material-symbols-outlined">replay</span> Reopen Ticket ({{ getReopenCount() }}/2)
+            <button *ngIf="!isAgentOnly() && getReopenCount() < 3" class="btn btn-outlined" (click)="reopenTicket()" title="Reopen Ticket (Attempt {{ getReopenCount() + 1 }} of 3)">
+              <span class="material-symbols-outlined">replay</span> Reopen Ticket ({{ getReopenCount() }}/3)
             </button>
-            <button *ngIf="getReopenCount() >= 2" class="btn btn-outlined btn-disabled-hint" disabled title="Maximum 2 reopens reached">
-              <span class="material-symbols-outlined">lock</span> Max Reopens (2/2) Reached
+            <button *ngIf="!isAgentOnly() && getReopenCount() >= 3" class="btn btn-outlined btn-disabled-hint" disabled title="Maximum 3 reopens reached">
+              <span class="material-symbols-outlined">lock</span> Max Reopens (3/3) Reached
             </button>
           </div>
         </div>
@@ -220,18 +291,18 @@ import { ToastService } from '../../services/toast.service';
         <div class="admin-action-panel mb-6 animate-fade" *ngIf="selectedTicket.status === 'closed'">
           <h4 class="form-label text-muted flex items-center gap-2">
             <span class="material-symbols-outlined">lock</span> Ticket Closed
-            <span *ngIf="getReopenCount() > 0" class="badge-role-tag role-manager" style="margin-left: 8px;">Reopened {{ getReopenCount() }}/2 times</span>
+            <span *ngIf="getReopenCount() > 0" class="badge-role-tag role-manager" style="margin-left: 8px;">Reopened {{ getReopenCount() }}/3 times</span>
           </h4>
           <p class="text-sm text-muted mb-3">This ticket is closed. As a Manager, you can permanently delete it or reopen it if needed.</p>
           <div class="flex gap-2 items-center flex-wrap">
             <button *ngIf="isManagerOrAdmin()" class="btn btn-danger" (click)="deleteTicket()" title="Permanently Delete Ticket">
               <span class="material-symbols-outlined">delete</span> Delete Ticket (Manager)
             </button>
-            <button *ngIf="getReopenCount() < 2" class="btn btn-outlined" (click)="reopenTicket()" title="Reopen Ticket (Attempt {{ getReopenCount() + 1 }} of 2)">
-              <span class="material-symbols-outlined">replay</span> Reopen Ticket ({{ getReopenCount() }}/2)
+            <button *ngIf="getReopenCount() < 3" class="btn btn-outlined" (click)="reopenTicket()" title="Reopen Ticket (Attempt {{ getReopenCount() + 1 }} of 3)">
+              <span class="material-symbols-outlined">replay</span> Reopen Ticket ({{ getReopenCount() }}/3)
             </button>
-            <button *ngIf="getReopenCount() >= 2" class="btn btn-outlined btn-disabled-hint" disabled title="Maximum 2 reopens reached">
-              <span class="material-symbols-outlined">lock</span> Max Reopens (2/2) Reached
+            <button *ngIf="getReopenCount() >= 3" class="btn btn-outlined btn-disabled-hint" disabled title="Maximum 3 reopens reached">
+              <span class="material-symbols-outlined">lock</span> Max Reopens (3/3) Reached
             </button>
           </div>
         </div>
@@ -292,7 +363,7 @@ import { ToastService } from '../../services/toast.service';
 
       <!-- REOPEN CONFIRMATION & CROSS-CHECK MODAL -->
       <div *ngIf="showReopenModal" class="modal-backdrop animate-fade" (click)="showReopenModal = false">
-        <div class="modal-dialog card-surface animate-pop" (click)="$event.stopPropagation()" style="max-width: 520px; border: 1px solid var(--corona-orange);">
+        <div class="modal-dialog card-surface animate-pop" (click)="$event.stopPropagation()" style="max-width: 540px; border: 1px solid var(--corona-orange);">
           <div class="modal-header flex justify-between items-center pb-3 border-b" style="border-color: var(--corona-border);">
             <div class="flex items-center gap-2">
               <span class="material-symbols-outlined" style="font-size: 26px; color: var(--corona-orange);">warning</span>
@@ -305,18 +376,35 @@ import { ToastService } from '../../services/toast.service';
 
           <div class="modal-body" style="padding: 18px 0;">
             <div class="p-3 mb-3" style="background: rgba(255, 171, 0, 0.12); border: 1px solid var(--corona-orange); border-radius: var(--radius-sm);">
-              <p style="font-size: 0.9rem; font-weight: 700; color: var(--corona-orange); margin: 0 0 6px 0;">
-                ⚠️ Please cross-check the ticket before it is reopened!
+              <p style="font-size: 0.95rem; font-weight: 700; color: var(--corona-orange); margin: 0 0 6px 0; display: flex; align-items: center; gap: 6px;">
+                <span class="material-symbols-outlined" style="font-size: 20px;">info</span>
+                ⚠️ Please cross-check everything before reopening!
               </p>
-              <p style="font-size: 0.82rem; color: #ffffff; margin: 0; line-height: 1.4;">
-                <strong>Policy Notice:</strong> A resolved ticket can only be reopened a <strong>maximum of 2 times</strong>.
+              <p style="font-size: 0.84rem; color: #ffffff; margin: 0; line-height: 1.5;">
+                Please cross-check all logs, application state, and execution results. Users can reopen a ticket for a <strong>maximum of 3 times</strong>.
                 <br />
-                This action will be <strong>reopen attempt {{ getReopenCount() + 1 }} of 2</strong>.
+                This action will be <strong>reopen attempt {{ getReopenCount() + 1 }} of 3</strong> and will be prioritized with <strong>elevated HIGH priority</strong>.
               </p>
             </div>
 
+            <div class="mb-3">
+              <label class="form-label font-bold text-white mb-1 block" style="font-size: 0.88rem;">
+                Detailed Reason for Reopening <span class="text-danger">*</span>
+              </label>
+              <textarea
+                class="form-textarea w-full"
+                rows="3"
+                style="width: 100%; border-radius: var(--radius-sm); font-size: 0.85rem;"
+                placeholder="Please explain in detail what was missing, what failed, or why this ticket requires further operational work..."
+                [(ngModel)]="reopenReason"
+              ></textarea>
+              <div *ngIf="reopenReasonError" class="text-danger text-xs mt-1 font-semibold flex items-center gap-1">
+                <span class="material-symbols-outlined" style="font-size: 14px;">error</span> {{ reopenReasonError }}
+              </div>
+            </div>
+
             <p style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.5; margin: 0;">
-              Once reopened, support employees can pick up the ticket, perform maintenance again, and resolve it upon verification.
+              Once reopened, support employees can pick up the ticket, review your detailed reason, perform maintenance again, and resolve it upon verification.
             </p>
           </div>
 
@@ -463,12 +551,19 @@ export class TicketDetailComponent implements OnInit {
   routeTeam = '';
   resolutionNotes = '';
   showReopenModal = false;
+  reopenReason = '';
+  reopenReasonError = '';
 
   availableAgents: any[] = [];
 
   isAdmin(): boolean {
     const role = (this.auth.userRole() || '').toLowerCase();
     return role === 'admin' || this.auth.isAdmin();
+  }
+
+  isManager(): boolean {
+    const role = (this.auth.userRole() || '').toLowerCase();
+    return role === 'manager' || this.auth.isManager();
   }
 
   isManagerOrAdmin(): boolean {
@@ -478,7 +573,51 @@ export class TicketDetailComponent implements OnInit {
 
   isAgentOrStaff(): boolean {
     const role = (this.auth.userRole() || '').toLowerCase();
-    return role === 'agent' || role === 'manager' || role === 'admin' || this.auth.isAgent();
+    return role === 'agent' || role === 'staff' || role === 'manager' || role === 'admin' || this.auth.isAgent() || this.auth.isManager() || this.auth.isAdmin();
+  }
+
+  getProcessStageLabel(status?: string): string {
+    switch (status) {
+      case 'pending_admin_approval': return 'Stage 1: Awaiting Admin Sign-off';
+      case 'open':
+      case 'approved': return 'Stage 2: Ready for Assignment';
+      case 'assigned': return 'Stage 2: Assigned to Employee';
+      case 'in_progress': return 'Stage 3: Maintenance in Progress';
+      case 'reopened': return 'Stage 3: Reopened (Urgent)';
+      case 'resolved': return 'Stage 4: Resolved & Verified';
+      case 'closed': return 'Stage 4: Closed';
+      default: return 'Stage 1: Submitted';
+    }
+  }
+
+  isStepActiveOrCompleted(step: number): boolean {
+    const status = this.selectedTicket?.status;
+    const currentStep = this.getStepNumber(status);
+    return currentStep >= step;
+  }
+
+  isStepCurrent(step: number): boolean {
+    const status = this.selectedTicket?.status;
+    return this.getStepNumber(status) === step;
+  }
+
+  private getStepNumber(status?: string): number {
+    switch (status) {
+      case 'pending_admin_approval':
+      case 'open': return 1;
+      case 'approved':
+      case 'assigned': return 2;
+      case 'in_progress':
+      case 'reopened': return 3;
+      case 'resolved':
+      case 'closed': return 4;
+      default: return 1;
+    }
+  }
+
+  isAgentOnly(): boolean {
+    const role = (this.auth.userRole() || '').toLowerCase();
+    return role === 'agent' && !this.auth.isAdmin() && !this.auth.isManager();
   }
 
   ngOnInit() {
@@ -497,21 +636,18 @@ export class TicketDetailComponent implements OnInit {
       if (res.ok) {
         this.availableAgents = await res.json();
       } else {
-        // Fallback default agents if endpoint not present
+        // Fallback to official employees
         this.availableAgents = [
-          { id: '3c8f8b88-1234-4b5b-8000-000000000002', email: 'bob@company.com', name: 'Bob (Support Agent)' },
-          { id: '3c8f8b88-1234-4b5b-8000-000000000003', email: 'alice@company.com', name: 'Alice (Support Manager)' },
-          { id: '3c8f8b88-1234-4b5b-8000-000000000002', email: 'bob@company.com', name: 'Employee Bob' },
-          { id: '3c8f8b88-1234-4b5b-8000-000000000003', email: 'alice@company.com', name: 'Manager Alice' },
-          { id: '3c8f8b88-1234-4b5b-8000-000000000001', email: 'admin@company.com', name: 'Admin Root' },
+          { id: '3c8f8b88-1234-4b5b-8000-000000000004', email: 'eegan@company.com', name: 'Eegan (Employee)' },
+          { id: '3c8f8b88-1234-4b5b-8000-000000000005', email: 'hari@company.com', name: 'Hari (Employee)' },
+          { id: '3c8f8b88-1234-4b5b-8000-000000000006', email: 'basker@company.com', name: 'Basker (Employee)' },
         ];
       }
     } catch (e) {
       this.availableAgents = [
-        { id: '3c8f8b88-1234-4b5b-8000-000000000002', email: 'bob@company.com', name: 'Bob (Support Agent)' },
-        { id: '3c8f8b88-1234-4b5b-8000-000000000003', email: 'alice@company.com', name: 'Alice (Support Manager)' },
-        { id: '3c8f8b88-1234-4b5b-8000-000000000002', email: 'bob@company.com', name: 'Employee Bob' },
-        { id: '3c8f8b88-1234-4b5b-8000-000000000003', email: 'alice@company.com', name: 'Manager Alice' },
+        { id: '3c8f8b88-1234-4b5b-8000-000000000004', email: 'eegan@company.com', name: 'Eegan (Employee)' },
+        { id: '3c8f8b88-1234-4b5b-8000-000000000005', email: 'hari@company.com', name: 'Hari (Employee)' },
+        { id: '3c8f8b88-1234-4b5b-8000-000000000006', email: 'basker@company.com', name: 'Basker (Employee)' },
       ];
     }
   }
@@ -527,6 +663,16 @@ export class TicketDetailComponent implements OnInit {
         this.selectedTicket = await res.json();
         this.targetStatus = this.selectedTicket.status;
         this.targetAssigneeEmail = this.selectedTicket.assigned_to_id || '';
+        
+        if (this.selectedTicket.status === 'reopened' && this.isAgentOrStaff()) {
+          this.toast.show(
+            '⚡ Reopened High Priority',
+            `Ticket #${this.selectedTicket.ticket_number} was reopened by customer (Priority: HIGH). Please review customer's reason and complete with urgency.`,
+            'warning',
+            this.selectedTicket.ticket_number
+          );
+        }
+        
         this.cdr.detectChanges();
       }
     } catch (e) { console.error(e); }
@@ -649,26 +795,42 @@ export class TicketDetailComponent implements OnInit {
     return this.selectedTicket?.meta_info?.reopen_count || 0;
   }
 
+  getLatestReopenReason(): string {
+    return this.selectedTicket?.meta_info?.latest_reopen_reason || '';
+  }
+
   reopenTicket() {
     if (!this.selectedTicket) return;
     const currentCount = this.getReopenCount();
-    if (currentCount >= 2) {
+    if (currentCount >= 3) {
       this.toast.show(
         'Reopen Limit Reached',
-        `Ticket #${this.selectedTicket.ticket_number} has already reached the maximum limit of 2 reopens and cannot be reopened further.`,
+        `Ticket #${this.selectedTicket.ticket_number} has already reached the maximum limit of 3 reopens and cannot be reopened further.`,
         'error',
         this.selectedTicket.ticket_number
       );
       return;
     }
+    this.reopenReason = '';
+    this.reopenReasonError = '';
     this.showReopenModal = true;
   }
 
   async confirmReopen() {
-    this.showReopenModal = false;
     if (!this.selectedTicket) return;
+    
+    if (!this.reopenReason || this.reopenReason.trim().length < 5) {
+      this.reopenReasonError = 'Please provide a detailed reason (at least 5 characters) explaining why you are reopening this ticket.';
+      return;
+    }
+
+    this.reopenReasonError = '';
+    this.showReopenModal = false;
+
     try {
-      const res = await this.api.post(`/api/tickets/${this.selectedTicket.id}/reopen`, {});
+      const res = await this.api.post(`/api/tickets/${this.selectedTicket.id}/reopen`, {
+        reason: this.reopenReason.trim()
+      });
       if (!res.ok) {
         const err = await res.json();
         alert(err.error?.message || err.detail?.message || 'Failed to reopen ticket');
@@ -677,7 +839,7 @@ export class TicketDetailComponent implements OnInit {
       const newCount = this.getReopenCount() + 1;
       this.toast.show(
         'Ticket Reopened',
-        `Ticket #${this.selectedTicket.ticket_number} reopened (Attempt ${newCount} of 2). Please cross-check ticket scope.`,
+        `Ticket #${this.selectedTicket.ticket_number} reopened (Attempt ${newCount} of 3). Elevated to HIGH priority.`,
         'warning',
         this.selectedTicket.ticket_number
       );

@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1
 FROM ghcr.io/astral-sh/uv:latest AS uv_bin
 FROM python:3.11-slim
 

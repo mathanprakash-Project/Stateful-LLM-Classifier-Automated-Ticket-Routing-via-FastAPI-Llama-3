@@ -37,7 +37,7 @@ class ChatService:
         return await self.chat_repo.list_user_sessions(user.id)
 
     async def process_user_message(
-        self, session_id: str, user: User, message_text: str
+        self, session_id: str, user: User, message_text: str, preferred_model: Optional[str] = None
     ) -> Dict[str, Any]:
         session = await self.get_session(session_id, user)
 
@@ -55,7 +55,7 @@ class ChatService:
             for m in session.messages
         ]
 
-        logger.info("[CHAT_TURN_START] session_id=%s, current_state=%s, user_msg=%s", session.id, session.agent_state, message_text)
+        logger.info("[CHAT_TURN_START] session_id=%s, model=%s, user_msg=%s", session.id, preferred_model, message_text)
 
         # 3. Run agent turn
         primary_role = user.roles[0].name.lower() if user.roles else "user"
@@ -67,6 +67,7 @@ class ChatService:
             existing_messages=existing_msgs,
             current_state=session.agent_state or {},
             user_role=primary_role,
+            preferred_model=preferred_model,
         )
 
         logger.info("[CHAT_TURN_END] agent_res intent=%s, act=%s, missing=%s, draft=%s", agent_res.get("intent"), agent_res.get("activity_code"), agent_res.get("missing_fields"), bool(agent_res.get("draft")))
@@ -78,7 +79,7 @@ class ChatService:
         # 4. Save generated draft if ready
         if draft_data and agent_res.get("needs_human_approval"):
             # Resolve category name to ID
-            cat_name = draft_data.get("category_name", "Software")
+            cat_name = draft_data.get("category_name", "Application UI")
             cat_model = await self.category_repo.get_by_name(cat_name)
             if not cat_model:
                 all_cats = await self.category_repo.list_all()
@@ -93,6 +94,26 @@ class ChatService:
                     sub_model = await self.category_repo.get_subcategory_by_name(cat_model.id, sub_name)
                     if sub_model:
                         draft_data["subcategory_id"] = sub_model.id
+
+            # Strictly ensure mode-based default priority
+            c_name = draft_data.get("category_name", "")
+            mode = draft_data.get("execution_mode", "")
+            user_msg_contents = [message_text]
+            if session.agent_state and isinstance(session.agent_state.get("messages"), list):
+                for m in session.agent_state["messages"]:
+                    if isinstance(m, dict) and m.get("role") == "user" and m.get("content"):
+                        user_msg_contents.append(str(m["content"]))
+            all_text = " ".join(user_msg_contents).lower()
+
+            has_explicit = any(k in all_text for k in ["priority critical", "priority high", "priority low", "priority medium", "priority:"])
+
+            if not has_explicit:
+                if c_name == "Application Version Maintenance" or mode == "Offline":
+                    draft_data["priority"] = "critical"
+                elif c_name == "Client Data Transfer" or mode == "Hybrid":
+                    draft_data["priority"] = "high"
+                else:
+                    draft_data["priority"] = "medium"
 
             draft_obj = await self.chat_repo.create_draft(
                 session_id=session.id,
@@ -120,7 +141,9 @@ class ChatService:
             "needs_human_approval": agent_res.get("needs_human_approval", False),
         }
 
-    async def approve_draft(self, session_id: str, draft_id: str, user: User) -> Dict[str, Any]:
+    async def approve_draft(
+        self, session_id: str, draft_id: str, user: User, custom_draft_data: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         session = await self.get_session(session_id, user)
         draft = await self.chat_repo.get_draft(draft_id)
 
@@ -130,13 +153,50 @@ class ChatService:
         if draft.status != "pending_review":
             raise ValidationError(f"Draft is already in status '{draft.status}'.")
 
-        data = draft.draft_data
+        data = dict(draft.draft_data or {})
+        if custom_draft_data:
+            data.update(custom_draft_data)
+            draft.draft_data = data
+
+        # Resolve category ID by name if changed or missing
         cat_id = data.get("category_id")
+        cat_name = data.get("category_name")
+        all_cats = await self.category_repo.list_all()
+
+        if cat_name and all_cats:
+            for c in all_cats:
+                if c.name.lower() == cat_name.lower() or cat_name.lower() in c.name.lower():
+                    cat_id = c.id
+                    break
+
         if not cat_id:
-            all_cats = await self.category_repo.list_all()
-            if not all_cats:
+            if all_cats:
+                cat_id = all_cats[0].id
+            else:
                 raise ValidationError("No valid category found.")
-            cat_id = all_cats[0].id
+
+        # Resolve activity code and properties if category changed
+        activity_code = data.get("activity_code")
+        if cat_name:
+            c_low = cat_name.lower()
+            if "version" in c_low:
+                activity_code = "APPLICATION_VERSION"
+                data["execution_mode"] = "Offline"
+                data["downtime_required"] = True
+                data["requires_admin_approval"] = True
+            elif "transfer" in c_low or "client" in c_low:
+                activity_code = "CLIENT_DATA_TRANSFER"
+                data["execution_mode"] = "Hybrid"
+                data["downtime_required"] = False
+                data["requires_admin_approval"] = True
+            elif "file" in c_low:
+                activity_code = "FILE_MANAGEMENT"
+                data["execution_mode"] = "Online"
+                data["downtime_required"] = False
+            elif "ui" in c_low:
+                activity_code = "APPLICATION_UI"
+                data["execution_mode"] = "Online"
+                data["downtime_required"] = False
 
         ticket_in = TicketCreate(
             title=data.get("title", "Support Request"),
@@ -145,15 +205,15 @@ class ChatService:
             subcategory_id=data.get("subcategory_id"),
             priority=data.get("priority", "medium"),
             meta_info=data.get("meta_info", {}),
-            activity_code=data.get("activity_code"),
-            technical_scope=data.get("technical_scope"),
-            responsible_team=data.get("responsible_team"),
+            activity_code=activity_code,
+            technical_scope=data.get("technical_scope", "application"),
+            responsible_team=data.get("responsible_team", "APPLICATION_SUPPORT"),
             requires_admin_approval=data.get("requires_admin_approval", False),
             execution_mode=data.get("execution_mode", "Online"),
             downtime_required=data.get("downtime_required", False),
             downtime_acknowledged=True,
             prerequisites_confirmed=True,
-            prerequisites_notes="Prerequisites and downtime confirmed via AI Chat conversation.",
+            prerequisites_notes=f"Prerequisites and maintenance schedule confirmed. Window: {data.get('maintenance_window', 'N/A')}",
         )
 
         ticket = await self.ticket_service.create_ticket(user, ticket_in)

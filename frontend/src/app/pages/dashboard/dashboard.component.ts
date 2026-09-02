@@ -52,6 +52,68 @@ interface DashboardStats {
         </button>
       </div>
 
+      <!-- CUSTOMER PROCESS & RESOLUTION TRACKER OVERVIEW (Clean, Un-congested with link to Ticket Status) -->
+      <div *ngIf="auth.isUser() && dashboardStats?.recent_tickets?.length" class="corona-card mb-6 animate-fade" style="border: 1px solid var(--corona-border); margin-top: 24px;">
+        <div class="card-header pb-2" style="border-bottom: 1px solid var(--corona-border);">
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined" style="font-size: 24px; color: var(--corona-purple);">track_changes</span>
+            <div>
+              <h3 class="card-title" style="margin: 0;">Recent Request Status Overview</h3>
+              <span class="card-subtitle">Active request progress tracker • Full workflow available in <strong>Ticket Status</strong></span>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <button class="btn btn-sm btn-outlined" routerLink="/ticket-status">
+              <span class="material-symbols-outlined text-sm">track_changes</span>
+              <span>All Status ({{ dashboardStats?.total_tickets || dashboardStats?.recent_tickets?.length }})</span>
+            </button>
+            <button class="btn-refresh-mini" (click)="loadDashboard()" title="Refresh Status">
+              <span class="material-symbols-outlined">refresh</span>
+            </button>
+          </div>
+        </div>
+
+        <div style="padding: 16px 0;" class="flex flex-col gap-3">
+          <div *ngFor="let t of (dashboardStats?.recent_tickets || []).slice(0, 2)" class="p-3 rounded flex flex-col md:flex-row justify-between items-start md:items-center gap-3"
+               style="background: #000000; border: 1px solid var(--corona-border); border-left: 4px solid;"
+               [style.border-left-color]="t.status === 'resolved' ? 'var(--corona-green)' : (t.status === 'in_progress' ? 'var(--corona-blue)' : (t.status === 'reopened' ? 'var(--corona-red)' : 'var(--corona-orange)'))">
+            
+            <div class="flex-1">
+              <div class="flex items-center gap-2 mb-1 flex-wrap">
+                <span style="font-weight: 800; font-size: 0.85rem; color: var(--corona-purple);">{{ t.ticket_number }}</span>
+                <span class="font-bold text-white text-sm">{{ t.title }}</span>
+                <span class="category-tag">{{ t.category_name || 'Application Support' }}</span>
+              </div>
+
+              <!-- Process Stage Banner -->
+              <div class="flex items-center gap-2 mt-2">
+                <div class="flex items-center gap-1 px-2 py-1 rounded text-xs font-bold"
+                     [style.background]="t.status === 'resolved' ? 'rgba(0, 210, 91, 0.15)' : (t.status === 'in_progress' ? 'rgba(0, 144, 231, 0.15)' : (t.status === 'reopened' ? 'rgba(255, 61, 0, 0.15)' : 'rgba(255, 171, 0, 0.15)'))"
+                     [style.color]="t.status === 'resolved' ? 'var(--corona-green)' : (t.status === 'in_progress' ? 'var(--corona-blue)' : (t.status === 'reopened' ? 'var(--corona-red)' : 'var(--corona-orange)'))">
+                  <span class="material-symbols-outlined" style="font-size: 16px;">{{ getProcessStageInfo(t.status).icon }}</span>
+                  {{ getProcessStageInfo(t.status).label }}
+                </div>
+                <span class="text-xs text-muted">{{ getProcessStageInfo(t.status).desc }}</span>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <button class="btn btn-sm btn-primary" (click)="viewTicketDetails(t.id)">
+                <span class="material-symbols-outlined text-sm">visibility</span>
+                <span>{{ t.status === 'resolved' ? 'Inspect Resolution' : 'View Workflow' }}</span>
+              </button>
+            </div>
+          </div>
+
+          <div *ngIf="(dashboardStats?.recent_tickets?.length || 0) > 2" class="text-center pt-2">
+            <a routerLink="/ticket-status" class="text-xs text-purple font-bold hover:underline flex items-center justify-center gap-1">
+              <span>View all {{ dashboardStats?.recent_tickets?.length }} requests with step-by-step stage tracker</span>
+              <span class="material-symbols-outlined text-xs">arrow_forward</span>
+            </a>
+          </div>
+        </div>
+      </div>
+
       <!-- 4-METRIC TOP CARDS GRID -->
       <div class="corona-metrics-grid">
         <!-- Metric 1: Total Tickets -->
@@ -868,6 +930,67 @@ export class DashboardComponent implements OnInit {
 
   formatStatus(status: string): string {
     return status ? status.replaceAll('_', ' ') : '';
+  }
+
+  getProcessStageInfo(status: string): { label: string; desc: string; step: number; icon: string } {
+    switch (status) {
+      case 'resolved':
+        return {
+          label: 'Stage 4: Activity Resolved & Verified',
+          desc: 'Support team has completed maintenance and verified operational state. Ready for your review.',
+          step: 4,
+          icon: 'task_alt'
+        };
+      case 'in_progress':
+        return {
+          label: 'Stage 3: Active Maintenance in Progress',
+          desc: 'Assigned Support Employee is actively performing operational steps.',
+          step: 3,
+          icon: 'engineering'
+        };
+      case 'assigned':
+        return {
+          label: 'Stage 2: Assigned to Support Employee',
+          desc: 'Ticket assigned to support personnel and queued for execution.',
+          step: 2,
+          icon: 'assignment_ind'
+        };
+      case 'pending_admin_approval':
+        return {
+          label: 'Stage 1: Pending Admin Governance Approval',
+          desc: 'High-impact operation awaiting Administrator authorization.',
+          step: 1,
+          icon: 'shield_lock'
+        };
+      case 'approved':
+        return {
+          label: 'Stage 2: Approved — Ready for Assignment',
+          desc: 'Admin has signed off. The ticket is ready to be assigned to a support employee.',
+          step: 2,
+          icon: 'verified'
+        };
+      case 'reopened':
+        return {
+          label: 'Stage 3: Reopened — Urgent Priority Follow-Up',
+          desc: 'Customer requested re-verification. Reopened with elevated HIGH priority.',
+          step: 3,
+          icon: 'priority_high'
+        };
+      case 'closed':
+        return {
+          label: 'Stage 5: Activity Closed & Archived',
+          desc: 'Maintenance completed and closed.',
+          step: 5,
+          icon: 'check_circle'
+        };
+      default:
+        return {
+          label: 'Stage 1: Request Created & Queued',
+          desc: 'Submitted and queued for initial review and routing.',
+          step: 1,
+          icon: 'pending'
+        };
+    }
   }
 
   getAvatarColorClass(index: number): string {

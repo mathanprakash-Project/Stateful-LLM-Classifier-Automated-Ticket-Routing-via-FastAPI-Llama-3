@@ -95,7 +95,16 @@ interface TicketSummary {
                 <td class="font-semibold">{{ t.title }}</td>
                 <td><span class="category-chip">{{ t.category_name || 'General' }}</span></td>
                 <td><span class="badge-priority priority-{{ t.priority }}">{{ t.priority }}</span></td>
-                <td><span class="status-badge status-{{ t.status }}">{{ formatStatus(t.status) }}</span></td>
+                <td>
+                  <div class="flex flex-col gap-1">
+                    <span class="status-badge status-{{ t.status }}">{{ formatStatus(t.status) }}</span>
+                    <span class="text-xs flex items-center gap-1 font-semibold"
+                          [style.color]="t.status === 'resolved' ? 'var(--corona-green)' : (t.status === 'in_progress' ? 'var(--corona-blue)' : (t.status === 'reopened' ? 'var(--corona-red)' : 'var(--text-muted)'))">
+                      <span class="material-symbols-outlined" style="font-size: 13px;">{{ getProcessStageIcon(t.status) }}</span>
+                      {{ getProcessStageShort(t.status) }}
+                    </span>
+                  </div>
+                </td>
                 <td>{{ t.assignee_name || 'Unassigned' }}</td>
                 <td>
                   <div class="flex items-center gap-2">
@@ -138,14 +147,10 @@ interface TicketSummary {
           <div class="form-group">
             <label class="form-label">Maintenance Activity</label>
             <select class="form-select font-semibold" [(ngModel)]="newTicket.activity_code" name="activity" (change)="onActivityChange()" required>
-              <option value="APPLICATION_UI">UI Change and Issues (Online · No Downtime)</option>
-              <option value="APPLICATION_VERSION">Application Versioning (Offline · Planned Downtime · Admin Approved)</option>
-              <option value="CLIENT_DATA_TRANSFER">Client Data Transfer (Hybrid · User Lockout · Admin Approved)</option>
-              <option value="FILE_MANAGEMENT">File Management (Online · No Downtime)</option>
-              <option value="APPLICATION_OTHER">General Application Support (Online · No Downtime)</option>
-              <option value="SERVER">Server / Infrastructure (Offline · Manager Routing)</option>
-              <option value="DATABASE">Database (Offline · Manager Routing)</option>
-              <option value="NETWORK">Network (Online · Manager Routing)</option>
+              <option value="APPLICATION_UI">Application UI (Online · No Downtime · Priority: Medium)</option>
+              <option value="APPLICATION_VERSION">Application Version Maintenance (Offline · Planned Downtime · Priority: Critical)</option>
+              <option value="CLIENT_DATA_TRANSFER">Client Data Transfer (Hybrid · User Lockout · Priority: High)</option>
+              <option value="FILE_MANAGEMENT">File Management (Online · No Downtime · Priority: Medium)</option>
             </select>
           </div>
 
@@ -274,7 +279,7 @@ interface TicketSummary {
     .mat-table tr:hover td { background: rgba(255, 255, 255, 0.02); }
     
     .ticket-num { font-weight: 700; color: var(--corona-purple); font-family: var(--font-heading); }
-    .category-chip { padding: 3px 8px; border-radius: 4px; background: #000000; border: 1px solid var(--corona-border); font-size: 0.75rem; color: var(--text-light); }
+    .category-chip { display: inline-block; white-space: nowrap; padding: 4px 10px; border-radius: 4px; background: #000000; border: 1px solid var(--corona-border); font-size: 0.75rem; color: var(--text-light); font-weight: 600; }
     
     .status-badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.68rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; }
     .status-open { background: rgba(255, 171, 0, 0.15); color: var(--corona-orange); }
@@ -497,10 +502,30 @@ export class TicketListComponent implements OnInit {
     if (this.selectedActivityDef) {
       this.newTicket.execution_mode = this.selectedActivityDef.execution_mode;
       this.newTicket.downtime_required = this.selectedActivityDef.downtime_required;
-      // Map category automatically if available
+
+      // Mode-based default priority: Online -> medium, Hybrid -> high, Offline -> critical
+      if (this.selectedActivityDef.execution_mode === 'Offline') {
+        this.newTicket.priority = 'critical';
+        this.newTicket.title = 'Application Version Maintenance';
+      } else if (this.selectedActivityDef.execution_mode === 'Hybrid') {
+        this.newTicket.priority = 'high';
+        this.newTicket.title = 'Client Data Transfer';
+      } else {
+        this.newTicket.priority = 'medium';
+        if (this.newTicket.activity_code === 'FILE_MANAGEMENT') {
+          this.newTicket.title = 'File Management Operations';
+        } else {
+          this.newTicket.title = 'Application UI Maintenance';
+        }
+      }
+
+      // Map matching category
       if (this.categories.length) {
-        const match = this.categories.find(c => c.name.toLowerCase().includes('application') || c.name.toLowerCase().includes('software'));
+        const match = this.categories.find(c =>
+          c.name.toLowerCase().includes(this.selectedActivityDef.activity_name.toLowerCase().split(' ')[0])
+        );
         if (match) this.newTicket.category_id = match.id;
+        else this.newTicket.category_id = this.categories[0].id;
       }
     }
   }
@@ -510,7 +535,12 @@ export class TicketListComponent implements OnInit {
   }
 
   canSubmitTicket(): boolean {
-    if (!this.newTicket.title || !this.newTicket.category_id || !this.newTicket.description) {
+    if (
+      !this.newTicket.title?.trim() ||
+      !this.newTicket.category_id ||
+      !this.newTicket.priority?.trim() ||
+      !this.newTicket.description?.trim()
+    ) {
       return false;
     }
     if (this.selectedActivityDef) {
@@ -525,6 +555,23 @@ export class TicketListComponent implements OnInit {
   }
 
   async submitManualTicket() {
+    if (!this.newTicket.title?.trim()) {
+      alert('⚠️ Ticket Title is mandatory.');
+      return;
+    }
+    if (!this.newTicket.category_id) {
+      alert('⚠️ Category is mandatory. Please select a category.');
+      return;
+    }
+    if (!this.newTicket.priority) {
+      alert('⚠️ Priority is mandatory. Please select a priority level.');
+      return;
+    }
+    if (!this.newTicket.description?.trim()) {
+      alert('⚠️ Issue Description is mandatory.');
+      return;
+    }
+
     try {
       const payload = {
         ...this.newTicket,
@@ -558,6 +605,32 @@ export class TicketListComponent implements OnInit {
       this.loadTickets();
     } catch (e: any) {
       alert('Error deleting ticket: ' + e.message);
+    }
+  }
+
+  getProcessStageShort(status: string): string {
+    switch (status) {
+      case 'resolved': return 'Resolved';
+      case 'in_progress': return 'In Progress';
+      case 'assigned': return 'Assigned';
+      case 'pending_admin_approval': return 'Approval Required';
+      case 'approved': return 'Approved';
+      case 'reopened': return 'Reopened';
+      case 'closed': return 'Closed';
+      default: return 'Queued';
+    }
+  }
+
+  getProcessStageIcon(status: string): string {
+    switch (status) {
+      case 'resolved': return 'task_alt';
+      case 'in_progress': return 'engineering';
+      case 'assigned': return 'assignment_ind';
+      case 'pending_admin_approval': return 'shield_lock';
+      case 'approved': return 'verified';
+      case 'reopened': return 'priority_high';
+      case 'closed': return 'check_circle';
+      default: return 'pending';
     }
   }
 

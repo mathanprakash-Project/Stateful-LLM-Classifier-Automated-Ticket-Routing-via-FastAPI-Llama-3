@@ -150,6 +150,21 @@ async def classify_intent_node(state: AgentState) -> Dict[str, Any]:
         result["activity_code"] = res["activity_code"]
         result["confidence"] = 0.8
 
+    # Keyword safety check to prioritize the 4 core Application Activities
+    user_lower = user_msg.lower()
+    if any(k in user_lower for k in ["upgrade", "downgrade", "version", "patch", "binary", "binaries"]):
+        result["intent"] = "APPLICATION_VERSION"
+        result["activity_code"] = "APPLICATION_VERSION"
+    elif any(k in user_lower for k in ["transfer data", "data migration", "client 100", "client 200", "copy client", "client sync"]):
+        result["intent"] = "CLIENT_DATA_TRANSFER"
+        result["activity_code"] = "CLIENT_DATA_TRANSFER"
+    elif any(k in user_lower for k in ["file management", "file upload", "file download", "archive logs"]):
+        result["intent"] = "FILE_MANAGEMENT"
+        result["activity_code"] = "FILE_MANAGEMENT"
+    elif any(k in user_lower for k in ["ui change", "button broken", "layout issue", "form field"]):
+        result["intent"] = "APPLICATION_UI"
+        result["activity_code"] = "APPLICATION_UI"
+
     # If an ongoing operational activity was already active in this session, keep it for follow-ups
     if existing_act not in ["UNKNOWN", "NON_TECHNICAL", None]:
         explicit_topic_change = bool(re.search(r"\b(what activities|explain activities|activity list|hello|hi|hey|tkt-|leave|salary|hr)\b", user_msg.lower()))

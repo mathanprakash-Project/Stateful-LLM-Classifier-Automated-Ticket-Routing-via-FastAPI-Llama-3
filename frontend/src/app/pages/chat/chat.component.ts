@@ -26,8 +26,17 @@ interface ChatMessage {
               <span class="material-symbols-outlined">psychology</span>
             </div>
             <div>
-              <h3 class="agent-name">IT Triage AI Agent <span class="model-badge">gpt-oss:120b-cloud</span></h3>
-              <span class="agent-sub">LangGraph Multi-Turn Diagnostic Workflow</span>
+              <div class="flex items-center gap-3 flex-wrap">
+                <h3 class="agent-name">IT Triage AI Agent</h3>
+                <!-- Model Switcher Dropdown -->
+                <div class="model-selector-pill">
+                  <span class="material-symbols-outlined text-sm" [ngClass]="selectedModel === 'llama3.2:3b' ? 'text-green' : 'text-accent'">{{ selectedModel === 'llama3.2:3b' ? 'bolt' : 'cloud' }}</span>
+                  <select [(ngModel)]="selectedModel" (change)="onModelChange()" class="model-dropdown-select" title="Switch Active AI Model">
+                    <option value="llama3.2:3b">⚡ llama3.2:3b (Local Edge)</option>
+                    <option value="gpt-oss:120b-cloud">☁️ gpt-oss:120b-cloud (Cloud Enterprise)</option>
+                  </select>
+                </div>
+              </div>
               <span class="agent-sub">{{ auth.isUser() ? 'LangGraph Multi-Turn Diagnostic & Ticket Creation' : 'Operational & Technical Activity Advisor (Staff Mode)' }}</span>
             </div>
           </div>
@@ -48,42 +57,48 @@ interface ChatMessage {
               <div class="markdown-body" [innerHTML]="renderMarkdown(m.displayedContent || m.content)"></div>
               <span *ngIf="m.isStreaming" class="typewriter-cursor"></span>
 
-              <!-- Interactive Ticket Draft Card -->
+              <!-- Interactive Ticket Draft Card (Editable & Validated) -->
               <div *ngIf="m.draft && !m.isStreaming" class="draft-card animate-pop">
                 <div class="draft-card-header">
                   <div class="draft-card-title">
                     <span class="material-symbols-outlined text-accent">assignment</span>
-                    <span>AI Ticket Draft Generated</span>
+                    <span>AI Ticket Draft (Editable Review)</span>
                   </div>
-                  <span class="badge-status-draft">Pending Confirmation</span>
+                  <span class="badge-status-draft">Editable Draft</span>
                 </div>
 
                 <div class="draft-grid">
-                  <div class="draft-field">
-                    <span class="df-label">Title</span>
-                    <span class="df-val">{{ m.draft.draft_data.title }}</span>
+                  <div class="draft-field col-span-2">
+                    <label class="df-label">Title</label>
+                    <input type="text" class="draft-text-field" [(ngModel)]="m.draft.draft_data.title" placeholder="Ticket title...">
                   </div>
                   <div class="draft-field">
-                    <span class="df-label">Category</span>
-                    <span class="df-val">{{ m.draft.draft_data.category_name || 'General' }}</span>
+                    <label class="df-label">Category</label>
+                    <select [(ngModel)]="m.draft.draft_data.category_name" class="draft-select-field" (change)="onDraftCategoryChange(m.draft)">
+                      <option value="Application UI">Application UI (Online)</option>
+                      <option value="Application Version Maintenance">Application Version Maintenance (Offline)</option>
+                      <option value="Client Data Transfer">Client Data Transfer (Hybrid)</option>
+                      <option value="File Management">File Management (Online)</option>
+                    </select>
                   </div>
                   <div class="draft-field">
-                    <span class="df-label">Priority</span>
-                    <span class="badge-priority priority-{{ m.draft.draft_data.priority }}">{{ m.draft.draft_data.priority }}</span>
-                  </div>
-                  <div class="draft-field">
-                    <span class="df-label">Affected System</span>
-                    <span class="df-val">{{ m.draft.draft_data.meta_info?.affected_system || 'General Device' }}</span>
+                    <label class="df-label">Priority</label>
+                    <select [(ngModel)]="m.draft.draft_data.priority" class="draft-select-field">
+                      <option value="low">Low (Standard)</option>
+                      <option value="medium">Medium (Online Default)</option>
+                      <option value="high">High (Hybrid Default / Urgent)</option>
+                      <option value="critical">Critical (Offline Default / Emergency)</option>
+                    </select>
                   </div>
                 </div>
 
-                <div class="draft-desc-box">
-                  <span class="df-label">Issue Description</span>
-                  <p>{{ m.draft.draft_data.description }}</p>
+                <div class="draft-desc-box mt-2">
+                  <label class="df-label">Issue Description</label>
+                  <textarea class="draft-textarea-field" rows="3" [(ngModel)]="m.draft.draft_data.description" placeholder="Describe the operational scope or error details..."></textarea>
                 </div>
 
                 <!-- Operational Maintenance Activity Details -->
-                <div class="draft-op-box p-3 mb-3" *ngIf="m.draft.draft_data?.activity_code">
+                <div class="draft-op-box p-3 mb-3">
                   <div class="flex flex-wrap gap-2 mb-2">
                     <span class="op-mode-pill mode-{{ (m.draft.draft_data.execution_mode || 'Online') | lowercase }}">
                       <span class="material-symbols-outlined">bolt</span>
@@ -91,7 +106,7 @@ interface ChatMessage {
                     </span>
                     <span class="op-downtime-pill" [class.downtime-warn]="m.draft.draft_data.downtime_required" [class.downtime-lockout]="m.draft.draft_data.execution_mode === 'Hybrid'">
                       <span class="material-symbols-outlined">{{ m.draft.draft_data.downtime_required ? 'power_off' : 'lock_clock' }}</span>
-                      {{ m.draft.draft_data.downtime_description || (m.draft.draft_data.downtime_required ? 'Planned Downtime' : 'No Downtime') }}
+                      {{ m.draft.draft_data.downtime_description || (m.draft.draft_data.downtime_required ? 'Planned Downtime' : (m.draft.draft_data.execution_mode === 'Hybrid' ? 'User Lockout' : 'No Downtime')) }}
                     </span>
                     <span *ngIf="m.draft.draft_data.requires_admin_approval" class="draft-restriction-badge warn">
                       <span class="material-symbols-outlined">shield_lock</span> Admin Approval Required
@@ -118,22 +133,27 @@ interface ChatMessage {
                   <!-- Maintenance Window / Downtime Input Field -->
                   <div class="mt-2 pt-2 border-top" *ngIf="m.draft.draft_data.downtime_required || m.draft.draft_data.execution_mode === 'Hybrid'">
                     <label class="text-xs text-dim block mb-1 font-semibold">
-                      <span class="material-symbols-outlined text-xs align-middle">schedule</span> Approved Maintenance Window / Downtime Schedule:
+                      <span class="material-symbols-outlined text-xs align-middle">schedule</span> Scheduled Maintenance Window / Downtime (Optional/Required):
                     </label>
                     <input type="text" class="chat-downtime-input" placeholder="e.g. Sunday 02:00 AM - 04:00 AM UTC" [(ngModel)]="m.draft.draft_data.maintenance_window">
                   </div>
 
-                  <!-- Mandatory confirmation checkbox -->
-                  <div class="mt-2 pt-2 border-top">
+                  <!-- Mandatory confirmation checkbox with visual validation error -->
+                  <div class="mt-2 pt-2 border-top" [class.checkbox-error-box]="m.draft.validationError">
                     <label class="checkbox-label text-xs">
-                      <input type="checkbox" [(ngModel)]="m.draft.prerequisites_confirmed">
-                      <span>I verify that prerequisites and downtime requirements have been reviewed and accepted.</span>
+                      <input type="checkbox" [(ngModel)]="m.draft.prerequisites_confirmed" (change)="m.draft.validationError = ''">
+                      <span>I verify that prerequisites, category, and downtime requirements have been reviewed.</span>
                     </label>
+                    <!-- Error Banner if user didn't check checkbox -->
+                    <div *ngIf="m.draft.validationError" class="draft-validation-alert animate-fade">
+                      <span class="material-symbols-outlined text-xs">error</span>
+                      <span>{{ m.draft.validationError }}</span>
+                    </div>
                   </div>
                 </div>
 
                 <div class="draft-actions" *ngIf="!m.draft.approved && !m.draft.rejected">
-                  <button class="btn btn-success" (click)="approveDraft(m.draft)" [disabled]="(m.draft.draft_data?.prerequisites?.length && !m.draft.prerequisites_confirmed) || (m.draft.draft_data?.downtime_required && !m.draft.draft_data?.maintenance_window)">
+                  <button class="btn btn-success" (click)="approveDraft(m.draft)">
                     <span class="material-symbols-outlined">check</span>
                     <span>Approve & Create Ticket</span>
                   </button>
@@ -164,7 +184,7 @@ interface ChatMessage {
               <span class="typing-dot"></span>
               <span class="typing-dot"></span>
               <span class="typing-dot"></span>
-              <span class="ml-2 text-sm text-muted">AI is analyzing with gpt-oss:120b...</span>
+              <span class="ml-2 text-sm text-muted">AI is analyzing with {{ selectedModel }}...</span>
             </div>
           </div>
         </div>
@@ -210,9 +230,27 @@ interface ChatMessage {
     .draft-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
     .draft-card-title { font-weight: 700; font-size: 0.92rem; display: flex; align-items: center; gap: 6px; color: var(--corona-purple); }
     .badge-status-draft { font-size: 0.68rem; background: rgba(143, 95, 232, 0.15); color: var(--corona-purple); border: 1px solid rgba(143, 95, 232, 0.3); padding: 2px 8px; border-radius: 4px; font-weight: 700; }
-    .draft-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
-    .df-label { display: block; font-size: 0.7rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; }
-    .df-val { font-size: 0.85rem; font-weight: 600; color: #ffffff; }
+    
+    .draft-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+    .col-span-2 { grid-column: span 2; }
+    .df-label { display: block; font-size: 0.7rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; margin-bottom: 4px; }
+    
+    .draft-text-field, .draft-select-field, .draft-textarea-field {
+      width: 100%;
+      background: #000000;
+      border: 1px solid var(--corona-border);
+      border-radius: var(--radius-sm);
+      padding: 6px 10px;
+      font-size: 0.84rem;
+      color: #ffffff;
+      font-family: inherit;
+      box-sizing: border-box;
+      outline: none;
+    }
+    .draft-text-field:focus, .draft-select-field:focus, .draft-textarea-field:focus {
+      border-color: var(--corona-purple);
+    }
+    
     .draft-desc-box { background: #000000; padding: 10px 14px; border-radius: var(--radius-sm); font-size: 0.85rem; margin-bottom: 14px; border: 1px solid var(--corona-border); }
     .draft-actions { display: flex; gap: 10px; }
     .draft-confirmed { display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 0.85rem; color: var(--corona-green); }
@@ -284,8 +322,40 @@ interface ChatMessage {
     .checkbox-label { display: flex; align-items: flex-start; gap: 8px; font-size: 0.78rem; cursor: pointer; color: #ffffff; line-height: 1.3; }
     .checkbox-label input { margin-top: 2px; accent-color: var(--corona-green); }
 
+    .checkbox-error-box { background: rgba(252, 66, 74, 0.08); border: 1px solid var(--corona-red); border-radius: 4px; padding: 8px; }
+    .draft-validation-alert { display: flex; align-items: center; gap: 6px; color: var(--corona-red); font-size: 0.78rem; font-weight: 700; margin-top: 6px; }
+
     .chat-downtime-input { width: 100%; background: #000000; border: 1px solid var(--corona-border); border-radius: var(--radius-sm); padding: 6px 10px; font-size: 0.8rem; color: #ffffff; margin-top: 4px; box-sizing: border-box; }
     .chat-downtime-input:focus { border-color: var(--corona-purple); outline: none; }
+
+    .model-selector-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #000000;
+      border: 1px solid var(--corona-border);
+      border-radius: 20px;
+      padding: 3px 8px;
+      transition: var(--transition);
+    }
+    .model-selector-pill:hover {
+      border-color: var(--corona-purple);
+    }
+    .model-dropdown-select {
+      background: transparent;
+      border: none;
+      color: #ffffff;
+      font-size: 0.75rem;
+      font-weight: 700;
+      outline: none;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .model-dropdown-select option {
+      background: #12151e;
+      color: #ffffff;
+      font-weight: 600;
+    }
 
     .typing-dot:nth-child(2) { animation-delay: -0.16s; }
     @keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
@@ -302,9 +372,17 @@ export class ChatComponent implements OnInit {
   chatMessages: ChatMessage[] = [];
   currentInput = '';
   isThinking = false;
+  selectedModel: string = 'llama3.2:3b';
 
   ngOnInit() {
+    const saved = localStorage.getItem('preferred_ai_model');
+    if (saved) this.selectedModel = saved;
     this.startNewChatSession();
+  }
+
+  onModelChange() {
+    localStorage.setItem('preferred_ai_model', this.selectedModel);
+    this.cdr.detectChanges();
   }
 
   async startNewChatSession() {
@@ -339,9 +417,31 @@ export class ChatComponent implements OnInit {
     this.scrollToBottom();
 
     try {
-      const res = await this.api.post(`/api/chat/sessions/${this.chatSessionId}/messages`, { content: text });
+      const res = await this.api.post(`/api/chat/sessions/${this.chatSessionId}/messages`, {
+        content: text,
+        preferred_model: this.selectedModel,
+      });
       if (!res.ok) throw new Error('Chat API error');
       const data = await res.json();
+
+      if (data.draft && data.draft.draft_data) {
+        const cat = data.draft.draft_data.category_name;
+        const mode = data.draft.draft_data.execution_mode;
+        let defaultPrio = 'medium';
+        if (cat === 'Application Version Maintenance' || mode === 'Offline') {
+          defaultPrio = 'critical';
+        } else if (cat === 'Client Data Transfer' || mode === 'Hybrid') {
+          defaultPrio = 'high';
+        } else {
+          defaultPrio = 'medium';
+        }
+
+        let prio = (data.draft.draft_data.priority || defaultPrio).toString().toLowerCase();
+        if (!['low', 'medium', 'high', 'critical'].includes(prio)) {
+          prio = defaultPrio;
+        }
+        data.draft.draft_data.priority = prio;
+      }
 
       const newMsg: ChatMessage = {
         role: 'ai',
@@ -381,14 +481,118 @@ export class ChatComponent implements OnInit {
     }, 18);
   }
 
+  onDraftCategoryChange(draft: any) {
+    if (!draft || !draft.draft_data) return;
+    const cat = draft.draft_data.category_name;
+
+    switch (cat) {
+      case 'Application UI':
+        draft.draft_data.title = 'Application UI Maintenance';
+        draft.draft_data.activity_code = 'APPLICATION_UI';
+        draft.draft_data.execution_mode = 'Online';
+        draft.draft_data.downtime_required = false;
+        draft.draft_data.downtime_description = 'No Downtime';
+        draft.draft_data.priority = 'medium'; // Online mode default: medium
+        draft.draft_data.requires_admin_approval = false;
+        draft.draft_data.risk_warning = '';
+        break;
+
+      case 'Application Version Maintenance':
+        draft.draft_data.title = 'Application Version Maintenance';
+        draft.draft_data.activity_code = 'APPLICATION_VERSION';
+        draft.draft_data.execution_mode = 'Offline';
+        draft.draft_data.downtime_required = true;
+        draft.draft_data.downtime_description = 'Yes (Planned Downtime)';
+        draft.draft_data.priority = 'critical'; // Offline mode default: critical
+        draft.draft_data.requires_admin_approval = true;
+        draft.draft_data.risk_warning = 'Requires offline maintenance window and Administrator authorization.';
+        break;
+
+      case 'Client Data Transfer':
+        draft.draft_data.title = 'Client Data Transfer';
+        draft.draft_data.activity_code = 'CLIENT_DATA_TRANSFER';
+        draft.draft_data.execution_mode = 'Hybrid';
+        draft.draft_data.downtime_required = false;
+        draft.draft_data.downtime_description = 'No Full Downtime (User Lockout Required)';
+        draft.draft_data.priority = 'high'; // Hybrid mode default: high
+        draft.draft_data.requires_admin_approval = true;
+        draft.draft_data.risk_warning = 'Active users must be locked out during data synchronization.';
+        break;
+
+      case 'File Management':
+        draft.draft_data.title = 'File Management Operations';
+        draft.draft_data.activity_code = 'FILE_MANAGEMENT';
+        draft.draft_data.execution_mode = 'Online';
+        draft.draft_data.downtime_required = false;
+        draft.draft_data.downtime_description = 'No Downtime';
+        draft.draft_data.priority = 'medium'; // Online mode default: medium
+        draft.draft_data.requires_admin_approval = false;
+        draft.draft_data.risk_warning = '';
+        break;
+    }
+    this.cdr.detectChanges();
+  }
+
   async approveDraft(draft: any) {
+    if (!draft || !draft.draft_data) return;
+
+    const title = (draft.draft_data.title || '').trim();
+    const category = (draft.draft_data.category_name || '').trim();
+    const priority = (draft.draft_data.priority || '').trim();
+    const description = (draft.draft_data.description || '').trim();
+
+    // Mandatory Field Validations
+    if (!title) {
+      draft.validationError = 'Ticket Title is mandatory. Please provide an activity title.';
+      alert('⚠️ Ticket Title is mandatory. Please provide an activity title.');
+      this.cdr.detectChanges();
+      return;
+    }
+
+    if (!category) {
+      draft.validationError = 'Category is mandatory. Please select an application category.';
+      alert('⚠️ Category is mandatory. Please select an application category.');
+      this.cdr.detectChanges();
+      return;
+    }
+
+    if (!priority) {
+      draft.validationError = 'Priority is mandatory. Please select a priority level.';
+      alert('⚠️ Priority is mandatory. Please select a priority level.');
+      this.cdr.detectChanges();
+      return;
+    }
+
+    if (!description) {
+      draft.validationError = 'Issue Description is mandatory. Please provide a description of the issue.';
+      alert('⚠️ Issue Description is mandatory. Please provide a description of the issue.');
+      this.cdr.detectChanges();
+      return;
+    }
+
+    // Checkbox Validation
+    if (!draft.prerequisites_confirmed) {
+      draft.validationError = 'Please check and click the confirmation checkbox before creating the ticket.';
+      alert('⚠️ Please check and click the confirmation checkbox before creating the ticket.');
+      this.cdr.detectChanges();
+      return;
+    }
+
+    draft.validationError = '';
     try {
-      const res = await this.api.post(`/api/chat/sessions/${this.chatSessionId}/drafts/${draft.id}/approve`, {});
+      const res = await this.api.post(`/api/chat/sessions/${this.chatSessionId}/drafts/${draft.id}/approve`, {
+        custom_data: draft.draft_data
+      });
       if (res.ok) {
         draft.approved = true;
         this.cdr.detectChanges();
+      } else {
+        const err = await res.json();
+        alert(err.error?.message || 'Failed to approve draft');
       }
-    } catch (e) { console.error(e); }
+    } catch (e: any) {
+      alert(e.message || 'Failed to approve draft');
+    }
   }
 
   async rejectDraft(draft: any) {

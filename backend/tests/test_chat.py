@@ -86,3 +86,95 @@ async def test_out_of_scope_message_rejected(client: AsyncClient):
     data = msg_resp.json()
     assert data.get("draft") is None
     assert "technical IT support" in data["response"] or "cannot create support tickets" in data["response"] or "non-technical" in data["response"].lower()
+
+
+@pytest.mark.asyncio
+async def test_explain_single_activity_alone(client: AsyncClient):
+    login_resp = await client.post(
+        "/auth/login",
+        json={"email": "john@company.com", "password": "password123"},
+    )
+    token = login_resp.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    session_resp = await client.post("/chat/sessions", headers=headers)
+    session_id = session_resp.json()["id"]
+
+    # Ask specifically to explain Client Data Transfer alone
+    msg_resp = await client.post(
+        f"/chat/sessions/{session_id}/messages",
+        json={"content": "can u explain the activity of client transfer data alone"},
+        headers=headers,
+    )
+    assert msg_resp.status_code == 200
+    data = msg_resp.json()
+    resp_text = data["response"]
+
+    # Must contain Client Data Transfer details and NOT the full overview table of other activities
+    assert "Client Data Transfer" in resp_text or "CLIENT_DATA_TRANSFER" in resp_text
+    assert "User Lockout" in resp_text or "lock" in resp_text.lower()
+    assert "Prerequisites Checklist" in resp_text or "Prerequisites" in resp_text
+    # Ensure it did not dump the full 5-activity table
+    assert "Application Versioning" not in resp_text or "Operational Property" in resp_text
+
+
+@pytest.mark.asyncio
+async def test_explain_hybrid_execution_mode_and_downtime(client: AsyncClient):
+    login_resp = await client.post(
+        "/auth/login",
+        json={"email": "john@company.com", "password": "password123"},
+    )
+    token = login_resp.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    session_resp = await client.post("/chat/sessions", headers=headers)
+    session_id = session_resp.json()["id"]
+
+    # Ask the exact user query: "execution mode can you explain what is about hybrid do we need to give downtime are not"
+    msg_resp = await client.post(
+        f"/chat/sessions/{session_id}/messages",
+        json={"content": "execution mode can you explain what is about hybrid do we need to give downtime are not"},
+        headers=headers,
+    )
+    assert msg_resp.status_code == 200
+    data = msg_resp.json()
+    resp_text = data["response"]
+
+    # Must explain Hybrid mode and Downtime / Lockout policy
+    assert "Hybrid" in resp_text
+    assert "NO Full" in resp_text or "No Full" in resp_text or "not required" in resp_text.lower()
+    assert "User Lockout" in resp_text or "lock" in resp_text.lower()
+    # Must NOT return the generic overview greeting table
+    assert "Enterprise Application Support AI Specialist" not in resp_text
+
+
+@pytest.mark.asyncio
+async def test_multiturn_history_context(client: AsyncClient):
+    login_resp = await client.post(
+        "/auth/login",
+        json={"email": "john@company.com", "password": "password123"},
+    )
+    token = login_resp.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    session_resp = await client.post("/chat/sessions", headers=headers)
+    session_id = session_resp.json()["id"]
+
+    # Turn 1: Ask about Client Data Transfer
+    await client.post(
+        f"/chat/sessions/{session_id}/messages",
+        json={"content": "tell me about client data transfer"},
+        headers=headers,
+    )
+
+    # Turn 2: Follow-up question about downtime
+    msg2_resp = await client.post(
+        f"/chat/sessions/{session_id}/messages",
+        json={"content": "is downtime required for this?"},
+        headers=headers,
+    )
+    assert msg2_resp.status_code == 200
+    resp_text = msg2_resp.json()["response"]
+    assert "Lockout" in resp_text or "downtime" in resp_text.lower()
+
+
