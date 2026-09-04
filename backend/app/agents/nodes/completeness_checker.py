@@ -32,7 +32,7 @@ def check_completeness_node(state: AgentState) -> Dict[str, Any]:
     desc = extracted.get("description")
     cat = extracted.get("category")
     
-    is_maintenance_act = act_def and act_def.activity_code not in ["UNKNOWN", "APPLICATION_OTHER", "SERVER", "DATABASE", "NETWORK", "SECURITY"]
+    is_maintenance_act = act_def and act_def.activity_code not in ["UNKNOWN", "SERVER", "DATABASE", "NETWORK", "SECURITY"]
 
     if not is_maintenance_act:
         if not title or len(str(title).strip()) < 4:

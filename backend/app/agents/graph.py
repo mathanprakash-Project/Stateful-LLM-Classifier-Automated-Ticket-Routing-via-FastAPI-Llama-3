@@ -36,7 +36,7 @@ def route_by_intent(state: AgentState) -> Literal["extract_info", "generate_resp
     if is_informational_query(user_msg):
         return "generate_response"
 
-    intent = state.get("intent", "APPLICATION_OTHER")
+    intent = state.get("intent", "APPLICATION_UI")
     # Intents that go directly to response generation (no ticket extraction needed)
     skip_extraction_intents = {"NON_TECHNICAL", "out_of_scope", "ticket_status", "general_query"}
     if intent in skip_extraction_intents:

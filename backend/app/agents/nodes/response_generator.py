@@ -21,6 +21,24 @@ from app.core.activity_registry import get_activity, ActivityDefinition, ACTIVIT
 
 logger = logging.getLogger(__name__)
 
+SUPPORT_TEAM_OUT_OF_SCOPE_RESPONSE = (
+    "Thank you for reaching out to SupportHub AI. We are happy to assist you with any technical issues related to our application. "
+    "However, we want to politely inform you that our support system is not configured to provide information on non-technical topics "
+    "such as personal inquiries, food recommendations, or places to visit.\n\n"
+    "As the Enterprise Application Support Team, we are strictly focused on assisting with technical application maintenance and operations. "
+    "Our team is equipped to help with the following activities:\n\n"
+    "- **Application UI Maintenance** (Online, No Downtime)\n"
+    "- **File Management Operations** (Online, No Downtime)\n"
+    "- **Client Data Transfer** (Hybrid, User Lockout)\n"
+    "- **Application Version Maintenance** (Offline, Planned Downtime)\n\n"
+    "If you are experiencing any issues with our application, such as difficulties with file management or data transfer, we would be happy to help you troubleshoot or resolve the issue. "
+    "Alternatively, if you have any questions about application UI maintenance or version updates, we would be more than happy to assist you.\n\n"
+    "Please let us know how we can help with any technical application-related matters, and we will do our best to provide a solution.\n\n"
+    "Best regards,  \n"
+    "**Enterprise Application Support Team**  \n"
+    "SupportHub AI"
+)
+
 
 def detect_specific_activity_in_query(query: str) -> Optional[str]:
     q = (query or "").lower().strip()
@@ -36,9 +54,9 @@ def detect_specific_activity_in_query(query: str) -> Optional[str]:
     # 4. UI Change and Issues
     if any(k in q for k in ["ui change", "ui issue", "ui activity", "screen layout", "ui bug", "ui error", "broken button", "frontend bug", "layout problem"]):
         return "APPLICATION_UI"
-    # 5. General Support / Other Application
+    # 5. General Support / Application Screen Issues
     if any(k in q for k in ["general support", "application support", "login issue", "account access"]):
-        return "APPLICATION_OTHER"
+        return "APPLICATION_UI"
     # 6. Database
     if any(k in q for k in ["database", "dba", "db connection", "db storage", "sql issue"]):
         return "DATABASE"
@@ -135,7 +153,7 @@ def handle_conceptual_and_operational_inquiry(
             "2. **Hybrid Mode (`CLIENT_DATA_TRANSFER`):**\n"
             "   - **Downtime:** No full server downtime, but requires a temporary **User Login Lockout** on target systems.\n"
             "   - **Reason:** Prevents concurrent write conflicts while migrating database records.\n\n"
-            "3. **Online Mode (`FILE_MANAGEMENT`, `APPLICATION_UI`, `APPLICATION_OTHER`):**\n"
+            "3. **Online Mode (`FILE_MANAGEMENT`, `APPLICATION_UI`):**\n"
             "   - **Downtime:** Zero Downtime.\n"
             "   - **Reason:** Background scripts and interface styling apply cleanly with continuous business operations.\n\n"
             "---\n"
@@ -149,8 +167,7 @@ def handle_conceptual_and_operational_inquiry(
             "- **Application Versioning (`APPLICATION_VERSION`):** **YES — Planned Downtime Required.** All services must be temporarily stopped to replace core engine executables.\n"
             "- **Client Data Transfer (`CLIENT_DATA_TRANSFER`):** **NO Full Downtime**, but **User Lockout is required** on the target test environment during the transfer window to prevent data corruption.\n"
             "- **File Management (`FILE_MANAGEMENT`):** **NO Downtime.** Scheduled scripts execute in the background.\n"
-            "- **UI Changes & Issues (`APPLICATION_UI`):** **NO Downtime.** Interface enhancements and fixes deploy live.\n"
-            "- **General Application Support (`APPLICATION_OTHER`):** **NO Downtime.**\n\n"
+            "- **UI Changes & Issues (`APPLICATION_UI`):** **NO Downtime.** Interface enhancements and fixes deploy live.\n\n"
             "---\n"
             "💬 *Which operational activity are you planning? Let me know and I will guide you through the exact requirements!*"
         )
@@ -310,24 +327,9 @@ async def generate_response_node(state: AgentState) -> Dict[str, Any]:
             )
         }
 
-    # 1. Out-of-scope / non-technical topic handler
+    # 1. Out-of-scope / non-technical topic handler (Standardized Enterprise Support Team response)
     if intent in ("out_of_scope", "NON_TECHNICAL"):
-        if settings.LLM_PROVIDER != "mock":
-            prompt = (
-                f"{OUT_OF_SCOPE_RESPONSE_PROMPT}\n\n"
-                f"User Message: {last_user_msg}\n\n"
-                f"Courteous IT Boundary Response in Markdown:"
-            )
-            llm_reply = await call_ollama(prompt)
-            if llm_reply:
-                return {"response_text": llm_reply}
-
-        response_text = (
-            "I can only assist with **technical IT support issues** (such as computer hardware, software errors, VPN/network connectivity, and account access).\n\n"
-            "I cannot create support tickets for personal inquiries, clothing/apparel, or non-technical topics.\n\n"
-            "If you are experiencing a technical issue with your work computer, applications, or network, please let me know and I'll be glad to help!"
-        )
-        return {"response_text": response_text}
+        return {"response_text": SUPPORT_TEAM_OUT_OF_SCOPE_RESPONSE}
 
     # 2. Ticket status handler
     if intent == "ticket_status":
@@ -357,27 +359,28 @@ async def generate_response_node(state: AgentState) -> Dict[str, Any]:
             if llm_res:
                 return {"response_text": llm_res}
 
-        response_text = (
-            "👋 **Hello! I'm your Enterprise Application Support AI Specialist.**\n\n"
-            "### 🛠️ **Operational Maintenance Activities Overview**\n\n"
-            "| Activity | Execution Mode | Downtime Required? | Customer Impact & Summary |\n"
-            "| :--- | :--- | :--- | :--- |\n"
-            "| **Application Versioning** (`APPLICATION_VERSION`) | Offline | **Yes** (Planned Downtime) | System executables and engine files are locked while running; all services must be stopped to apply core runtime upgrades. *(Requires Admin Approval)* |\n"
-            "| **Client Data Transfer** (`CLIENT_DATA_TRANSFER`) | Hybrid | **No Full Downtime** (User Lockout) | System remains powered on, but active users are locked out from target/source environments to avoid data conflicts. *(Requires Admin Approval)* |\n"
-            "| **File Management** (`FILE_MANAGEMENT`) | Online | **No Downtime** | Background housekeeping scripts clean, archive, and transfer host files seamlessly while normal business continues. |\n"
-            "| **UI Change and Issues** (`APPLICATION_UI`) | Online | **No Downtime** | Screen adaptations, layout enhancements, and UI error fixes deploy directly with zero business disruption. |\n"
-            "| **General Support** (`APPLICATION_OTHER`) | Online | **No Downtime** | Daily account access, performance guidance, and feature requests. |\n\n"
-            "---\n\n"
-            "### 💡 **How Our Operations Work:**\n"
-            "- **Application Versioning**: *Think of this as upgrading the engine of a car. Because we are replacing core moving parts, the system must be turned off briefly during the maintenance window.*\n"
-            "- **Client Data Transfer**: *The system stays on, but user logins in the target test system are temporarily locked to prevent partial entries from corrupting the transfer.*\n"
-            "- **File Management**: *Automated background housekeeping running scheduled archiving scripts with zero user interruption.*\n"
-            "- **UI Changes & Issues**: *Screen layout adjustments and error fixes published in real time with instant page refresh.*\n\n"
-            "### 🏢 **Out-of-Scope (Infrastructure, Database, Network, Security):**\n"
-            "Requests for database modifications, physical server restarts, or corporate firewalls will be reviewed and routed by **Managers** to the appropriate infrastructure engineering teams.\n\n"
-            "💬 *Please describe your specific maintenance request or issue, and I will guide you through prerequisites, downtime verification, and ticket drafting!*"
+        # Check if user message is an actual greeting or inquiry about what SupportHub AI does
+        greeting_or_capability = any(
+            k in last_user_msg.lower() for k in [
+                "hello", "hi", "hey", "good morning", "good afternoon", "good evening",
+                "what can you do", "what activities", "explain activities", "services",
+                "capabilities", "help", "who are you", "what do you support", "under your scope"
+            ]
         )
-        return {"response_text": response_text}
+        if greeting_or_capability:
+            response_text = (
+                "👋 **Hello! We're your Enterprise Application Support AI Team.**\n\n"
+                "We are here to assist you with our **4 supported technical application activities**:\n\n"
+                "1. 🖥️ **Application UI Maintenance** (`Online` · No Downtime) — Interface adaptations, layout adjustments, and screen error fixes.\n"
+                "2. 📁 **File Management Operations** (`Online` · No Downtime) — Scheduled archiving scripts, storage cleanup, and file synchronization.\n"
+                "3. 🔄 **Client Data Transfer** (`Hybrid` · User Lockout) — Tenant data synchronization and client-to-client migration.\n"
+                "4. ⚙️ **Application Version Maintenance** (`Offline` · Planned Downtime) — Core runtime version upgrades, binary deployments, and patches.\n\n"
+                "💬 *Please describe your specific maintenance request or technical issue, and our team will guide you through prerequisites, downtime verification, and ticket drafting!*"
+            )
+            return {"response_text": response_text}
+
+        # Any other irrelevant or general query gets the standardized Support Team response
+        return {"response_text": SUPPORT_TEAM_OUT_OF_SCOPE_RESPONSE}
 
     # 4. If grievance report is complete and draft is prepared
     if draft_data:

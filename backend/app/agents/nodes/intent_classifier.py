@@ -17,12 +17,21 @@ logger = logging.getLogger(__name__)
 
 # Non-IT keywords that indicate out-of-scope requests
 OUT_OF_SCOPE_KEYWORDS = [
+    # Clothing & Shopping
     "pant", "pants", "cargo", "jeans", "shirt", "tshirt", "t-shirt", "dress", "clothes", "clothing",
-    "shoe", "shoes", "wear", "zudio", "zara", "h&m", "fabric", "tailor", "tight", "loose",
-    "food", "pizza", "burger", "coffee", "lunch", "dinner", "recipe", "cook", "hungry",
+    "shoe", "shoes", "wear", "zudio", "zara", "h&m", "fabric", "tailor", "tight", "loose", "shop", "shopping", "mall", "market", "store",
+    # Food & Dining
+    "food", "pizza", "burger", "coffee", "tea", "lunch", "dinner", "recipe", "cook", "hungry",
+    "ice cream", "icecream", "dessert", "sweet", "restaurant", "cafe", "snack", "eat", "drink", "biryani",
+    # Entertainment & Sports
     "movie", "song", "lyrics", "cricket", "football", "match", "joke", "funny", "dating", "love",
+    # Health & Medical
     "medical", "doctor", "headache", "fever", "medicine", "pill", "hospital",
-    "leave", "salary", "hr", "hotel", "resume", "office location"
+    # Travel & Places & Weather
+    "travel", "flight", "train", "bus", "hotel", "weather", "rain", "temperature", "forecast",
+    "bangalore", "bengaluru", "delhi", "mumbai", "chennai", "hyderabad", "city", "place", "places", "tour", "tourism",
+    # Non-IT corporate / HR
+    "leave", "salary", "payroll", "hr", "appraisal", "hike", "resume", "interview", "office location", "cab"
 ]
 
 # Explicit IT / Technical keywords
@@ -97,19 +106,20 @@ def rule_based_intent_fallback(text: str, conversation_history: list = None) -> 
     # 8. Out-of-scope non-IT topics check
     has_out_of_scope = any(re.search(rf"\b{re.escape(kw)}\b", full_lower) for kw in OUT_OF_SCOPE_KEYWORDS)
     has_it_keyword = any(re.search(rf"\b{re.escape(kw)}\b", full_lower) for kw in IT_KEYWORDS)
+    is_non_it_inquiry = bool(re.search(r"\b(where (can|to|we|i|is|are)|find|best place|places to|how to reach|recommend a|buy a|sell a)\b", full_lower))
     
-    if has_out_of_scope and not has_it_keyword:
+    if (has_out_of_scope or is_non_it_inquiry) and not has_it_keyword:
         return {"intent": "NON_TECHNICAL", "activity_code": "NON_TECHNICAL"}
 
-    # 9. Default Application support (real issues)
+    # 9. Application support (real issues with IT keywords)
     if has_it_keyword or any(w in full_lower for w in ["slow", "broken", "issue", "not working", "fails", "down", "glitch", "problem", "downtime", "prerequisite"]):
-        return {"intent": "APPLICATION_OTHER", "activity_code": "APPLICATION_OTHER"}
+        return {"intent": "APPLICATION_UI", "activity_code": "APPLICATION_UI"}
 
     # If ambiguous and short
     if len(text.split()) < 4:
         return {"intent": "general_query", "activity_code": "UNKNOWN"}
 
-    return {"intent": "APPLICATION_OTHER", "activity_code": "APPLICATION_OTHER"}
+    return {"intent": "NON_TECHNICAL", "activity_code": "NON_TECHNICAL"}
 
 
 async def classify_intent_node(state: AgentState) -> Dict[str, Any]:
@@ -122,7 +132,7 @@ async def classify_intent_node(state: AgentState) -> Dict[str, Any]:
 
     valid_codes = {
         "APPLICATION_UI", "APPLICATION_VERSION", "CLIENT_DATA_TRANSFER", "FILE_MANAGEMENT",
-        "APPLICATION_OTHER", "SERVER", "DATABASE", "NETWORK", "SECURITY", "OTHER_TECHNICAL",
+        "SERVER", "DATABASE", "NETWORK", "SECURITY", "OTHER_TECHNICAL",
         "ticket_status", "draft_modification", "general_query", "NON_TECHNICAL"
     }
 
@@ -137,9 +147,9 @@ async def classify_intent_node(state: AgentState) -> Dict[str, Any]:
                 intent = parsed.get("intent", "").strip().upper()
                 # Find matching valid code
                 matched_code = next((c for c in valid_codes if c.upper() == intent), None)
-                if matched_code and matched_code not in ["GENERAL_QUERY", "NON_TECHNICAL"]:
+                if matched_code:
                     result["intent"] = matched_code
-                    result["activity_code"] = matched_code if matched_code not in ["ticket_status", "draft_modification"] else "UNKNOWN"
+                    result["activity_code"] = matched_code if matched_code not in ["ticket_status", "draft_modification", "general_query"] else "UNKNOWN"
                     result["confidence"] = parsed.get("confidence", 0.9)
             except Exception as exc:
                 logger.warning("Failed to parse LLM intent classification response: %s", exc)
@@ -149,6 +159,12 @@ async def classify_intent_node(state: AgentState) -> Dict[str, Any]:
         result["intent"] = res["intent"]
         result["activity_code"] = res["activity_code"]
         result["confidence"] = 0.8
+
+    # Out-of-scope safety check: if user message is non-technical, strictly enforce NON_TECHNICAL
+    rule_res = rule_based_intent_fallback(user_msg, messages)
+    if rule_res["intent"] == "NON_TECHNICAL":
+        result["intent"] = "NON_TECHNICAL"
+        result["activity_code"] = "NON_TECHNICAL"
 
     # Keyword safety check to prioritize the 4 core Application Activities
     user_lower = user_msg.lower()
@@ -166,7 +182,8 @@ async def classify_intent_node(state: AgentState) -> Dict[str, Any]:
         result["activity_code"] = "APPLICATION_UI"
 
     # If an ongoing operational activity was already active in this session, keep it for follow-ups
-    if existing_act not in ["UNKNOWN", "NON_TECHNICAL", None]:
+    # UNLESS the user asks a non-technical or out-of-scope query
+    if existing_act not in ["UNKNOWN", "NON_TECHNICAL", None] and result.get("intent") not in ["NON_TECHNICAL", "general_query"]:
         explicit_topic_change = bool(re.search(r"\b(what activities|explain activities|activity list|hello|hi|hey|tkt-|leave|salary|hr)\b", user_msg.lower()))
         if not explicit_topic_change:
             result["intent"] = existing_act
