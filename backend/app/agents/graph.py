@@ -17,11 +17,14 @@ from app.agents.state import AgentState
 
 def is_informational_query(msg: str) -> bool:
     q = (msg or "").lower().strip()
+    from app.core.activity_registry import check_downtime_window
+    if check_downtime_window(q) and not any(k in q for k in ["what is", "explain", "why", "how does", "difference"]):
+        return False
     return any(k in q for k in [
         "explain", "what is", "what does", "how does", "tell me about", "details of",
         "describe", "alone", "understand", "overview of", "walk me through", "guide on", "meaning of",
-        "hybrid", "execution mode", "downtime are not", "is downtime", "why do we", "do we need downtime",
-        "why downtime", "difference between", "how it works", "lockout"
+        "hybrid mode", "execution mode", "downtime are not", "is downtime", "why do we", "do we need downtime",
+        "why downtime", "difference between", "how it works", "what is lockout"
     ])
 
 

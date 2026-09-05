@@ -82,7 +82,15 @@ async def generate_draft_node(state: AgentState) -> Dict[str, Any]:
     user_msgs = [m.get("content", "") for m in messages if m.get("role") == "user"]
     if state.get("current_user_message"):
         user_msgs.append(state.get("current_user_message"))
-    last_user_text = user_msgs[-1] if user_msgs else "Confirmed via conversational triage."
+
+    from app.core.activity_registry import check_downtime_window
+    window_val = "Scheduled maintenance window verified."
+    for umsg in reversed(user_msgs):
+        if check_downtime_window(umsg):
+            window_val = umsg.strip()
+            break
+    if window_val == "Scheduled maintenance window verified." and user_msgs:
+        window_val = user_msgs[-1].strip()
 
     draft = {
         "title": title,
@@ -102,8 +110,8 @@ async def generate_draft_node(state: AgentState) -> Dict[str, Any]:
         "downtime_description": act_def.downtime_description,
         "prerequisites": act_def.prerequisites,
         "risk_warning": act_def.risk_warning,
-        "maintenance_window": last_user_text,
-        "prerequisites_notes": f"Maintenance Window / Schedule: {last_user_text}",
+        "maintenance_window": window_val,
+        "prerequisites_notes": f"Maintenance Window / Schedule: {window_val}",
     }
 
     return {

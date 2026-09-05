@@ -17,7 +17,16 @@ from app.agents.state import AgentState
 from app.config.settings import settings
 from app.core.llm_client import call_ollama
 
-from app.core.activity_registry import get_activity, ActivityDefinition, ACTIVITY_REGISTRY
+from app.core.activity_registry import (
+    get_activity,
+    ActivityDefinition,
+    ACTIVITY_REGISTRY,
+    SUPPORT_TEAM_ACTIVITIES_OVERVIEW_RESPONSE,
+    is_greeting_or_activity_overview,
+    check_prereq_ack,
+    check_downtime_window,
+    is_prereq_explicitly_pending,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -87,13 +96,17 @@ def handle_conceptual_and_operational_inquiry(
     current_activity: Optional[str] = None
 ) -> Optional[str]:
     q = (query or "").lower().strip()
+
+    # If the user is specifying a maintenance window / schedule, this is NOT a conceptual inquiry
+    if check_downtime_window(query) and not any(k in q for k in ["what is", "explain", "why", "how does", "difference"]):
+        return None
     
     # 1. Execution Mode & Downtime inquiries
-    is_hybrid_query = any(k in q for k in ["hybrid", "hybrid mode", "what is hybrid", "about hybrid"])
-    is_offline_query = any(k in q for k in ["offline", "offline mode", "what is offline", "about offline"])
-    is_online_query = any(k in q for k in ["online mode", "what is online", "about online"])
+    is_hybrid_query = any(k in q for k in ["what is hybrid", "explain hybrid", "about hybrid", "how does hybrid", "why hybrid", "hybrid mode explained"])
+    is_offline_query = any(k in q for k in ["what is offline", "explain offline", "about offline", "how does offline", "why offline", "offline mode explained"])
+    is_online_query = any(k in q for k in ["what is online", "explain online", "about online", "how does online", "why online", "online mode explained"])
     is_exec_mode_query = any(k in q for k in ["execution mode", "execution modes", "types of execution"])
-    is_downtime_query = any(k in q for k in ["downtime", "need downtime", "give downtime", "downtime are not", "is downtime required", "maintenance window", "user lockout", "lockout", "why downtime"])
+    is_downtime_query = any(k in q for k in ["is downtime required", "do we need downtime", "why downtime", "downtime policy", "downtime policies", "what is downtime", "explain downtime", "downtime are not"])
 
     if is_hybrid_query or (is_exec_mode_query and "hybrid" in q) or (is_downtime_query and ("hybrid" in q or "client" in q or "transfer" in q)):
         return (
@@ -244,6 +257,32 @@ async def generate_response_node(state: AgentState) -> Dict[str, Any]:
             history_lines.append(f"{role.capitalize()}: {content}")
     history_text = "\n".join(history_lines[-8:])
 
+    # 0. If ticket draft is prepared, present it immediately
+    if draft_data:
+        title = draft_data.get("title", "Support Request")
+        cat = draft_data.get("category_name", "General Support")
+        prio = draft_data.get("priority", "medium").upper()
+        activity = draft_data.get("activity_code", "UNKNOWN")
+        restricted = draft_data.get("restricted_operation", False)
+        manager_review = draft_data.get("requires_manager_review", False)
+        
+        response_text = f"✅ **Operational Ticket Draft Prepared:**\n\n"
+        response_text += f"- **Title:** {title}\n- **Activity / Category:** {cat} (`{activity}`)\n- **Priority:** `{prio}`\n\n"
+        
+        if manager_review and activity in ["SERVER", "DATABASE", "NETWORK", "SECURITY", "OTHER_TECHNICAL"]:
+            response_text = "This request is outside standard application support and will be routed to the specialized infrastructure team for Manager Review.\n\n" + response_text
+        elif restricted:
+            response_text = "This is a restricted operational maintenance activity. Please verify the prerequisites and downtime acknowledgment on the draft card below to submit it for Administrator Approval.\n\n" + response_text
+        else:
+            response_text += "Please review the draft card below, verify prerequisites, and click **Approve & Create Ticket** to send this to the support queue."
+
+        return {"response_text": response_text}
+
+    # Fast-path: If user is asking for activity overview or greeting (and not a single targeted activity)
+    target_act_code = detect_specific_activity_in_query(last_user_msg)
+    if is_greeting_or_activity_overview(last_user_msg) and not target_act_code:
+        return {"response_text": SUPPORT_TEAM_ACTIVITIES_OVERVIEW_RESPONSE}
+
     # 1. Check if the query is a conceptual / operational question (Execution Mode, Hybrid, Downtime, Lockout, etc.)
     conceptual_reply = handle_conceptual_and_operational_inquiry(last_user_msg, messages, state.get("activity_code"))
     if conceptual_reply:
@@ -261,7 +300,6 @@ async def generate_response_node(state: AgentState) -> Dict[str, Any]:
         return {"response_text": conceptual_reply}
 
     # 2. Targeted check: Did the user ask to explain a single specific activity?
-    target_act_code = detect_specific_activity_in_query(last_user_msg)
     is_explain_query = is_explanation_request_query(last_user_msg)
 
     if target_act_code and (is_explain_query or "alone" in last_user_msg.lower()):
@@ -341,76 +379,78 @@ async def generate_response_node(state: AgentState) -> Dict[str, Any]:
 
     # 3. General query / greetings / activity list handler
     if intent == "general_query":
-        # Check if this query is a follow-up or conceptual question
+        # Check if this query is a follow-up or conceptual question about a single activity
         if target_act_code:
             act_def = get_activity(target_act_code)
             if act_def:
                 return {"response_text": format_single_activity_comprehensive_explanation(act_def)}
 
+        # Check if user message is a greeting or inquiry about what we support / activity overview
+        if is_greeting_or_activity_overview(last_user_msg):
+            return {"response_text": SUPPORT_TEAM_ACTIVITIES_OVERVIEW_RESPONSE}
+
         # If it's a follow up turn (history exists), call dynamic LLM response rather than static greeting
         if len(messages) > 1 and settings.LLM_PROVIDER != "mock":
             dynamic_prompt = (
-                "You are SupportHub AI, a helpful, intelligent Application Support Specialist.\n"
+                "You are an expert Enterprise Application Support AI Specialist.\n"
                 f"Conversation History:\n{history_text}\n\n"
                 f"User Message: {last_user_msg}\n\n"
-                "Respond directly and conversationally to the user without sending a generic greeting template."
+                "Respond directly and conversationally to the user in a helpful, professional tone."
             )
             llm_res = await call_ollama(dynamic_prompt)
             if llm_res:
                 return {"response_text": llm_res}
 
-        # Check if user message is an actual greeting or inquiry about what SupportHub AI does
-        greeting_or_capability = any(
-            k in last_user_msg.lower() for k in [
-                "hello", "hi", "hey", "good morning", "good afternoon", "good evening",
-                "what can you do", "what activities", "explain activities", "services",
-                "capabilities", "help", "who are you", "what do you support", "under your scope"
-            ]
-        )
-        if greeting_or_capability:
-            response_text = (
-                "👋 **Hello! We're your Enterprise Application Support AI Team.**\n\n"
-                "We are here to assist you with our **4 supported technical application activities**:\n\n"
-                "1. 🖥️ **Application UI Maintenance** (`Online` · No Downtime) — Interface adaptations, layout adjustments, and screen error fixes.\n"
-                "2. 📁 **File Management Operations** (`Online` · No Downtime) — Scheduled archiving scripts, storage cleanup, and file synchronization.\n"
-                "3. 🔄 **Client Data Transfer** (`Hybrid` · User Lockout) — Tenant data synchronization and client-to-client migration.\n"
-                "4. ⚙️ **Application Version Maintenance** (`Offline` · Planned Downtime) — Core runtime version upgrades, binary deployments, and patches.\n\n"
-                "💬 *Please describe your specific maintenance request or technical issue, and our team will guide you through prerequisites, downtime verification, and ticket drafting!*"
-            )
-            return {"response_text": response_text}
+        # Any other general query defaults to the activities overview
+        return {"response_text": SUPPORT_TEAM_ACTIVITIES_OVERVIEW_RESPONSE}
 
-        # Any other irrelevant or general query gets the standardized Support Team response
-        return {"response_text": SUPPORT_TEAM_OUT_OF_SCOPE_RESPONSE}
-
-    # 4. If grievance report is complete and draft is prepared
-    if draft_data:
-        title = draft_data.get("title", "Support Request")
-        cat = draft_data.get("category_name", "General Support")
-        prio = draft_data.get("priority", "medium").upper()
-        activity = draft_data.get("activity_code", "UNKNOWN")
-        restricted = draft_data.get("restricted_operation", False)
-        manager_review = draft_data.get("requires_manager_review", False)
-        
-        response_text = f"✅ **Operational Ticket Draft Prepared:**\n\n"
-        response_text += f"- **Title:** {title}\n- **Activity / Category:** {cat} (`{activity}`)\n- **Priority:** `{prio}`\n\n"
-        
-        if manager_review and activity in ["SERVER", "DATABASE", "NETWORK", "SECURITY", "OTHER_TECHNICAL"]:
-            response_text = "This request is outside standard application support and will be routed to the specialized infrastructure team for Manager Review.\n\n" + response_text
-        elif restricted:
-            response_text = "This is a restricted operational maintenance activity. Please verify the prerequisites and downtime acknowledgment on the draft card below to submit it for Administrator Approval.\n\n" + response_text
-        else:
-            response_text += "Please review the draft card below, verify prerequisites, and click **Approve & Create Ticket** to send this to the support queue."
-
-        return {"response_text": response_text}
-
-    # 5. Targeted Maintenance Operational Diagnostic (No apologies, direct prerequisite & downtime check)
+    # 5. Targeted Maintenance Operational Diagnostic (Interactive prerequisite & downtime checks)
     act_code = state.get("activity_code", intent)
     act_def = get_activity(act_code)
 
     if act_def and act_def.prerequisites:
+        is_prereq_missing = "prerequisites_status" in missing
+        is_window_missing = "maintenance_window" in missing
         prereq_items = "\n".join([f"- {p}" for p in act_def.prerequisites])
         downtime_info = act_def.downtime_description
-        
+
+        # Check if user explicitly stated prerequisites are pending / not yet done
+        if is_prereq_explicitly_pending(last_user_msg):
+            return {
+                "response_text": (
+                    f"⚠️ **Prerequisites Pending for {act_def.activity_name}**\n\n"
+                    f"Because **{act_def.activity_name}** operates in **{act_def.execution_mode} Mode** ({downtime_info}), all prerequisites must be completed before performing maintenance to avoid system or database conflicts.\n\n"
+                    f"**Mandatory Prerequisites Checklist:**\n{prereq_items}\n\n"
+                    f"👉 *Please complete the pending items. Once verified, confirm here and let us know your approved maintenance window so we can generate your ticket draft!*"
+                )
+            }
+
+        # Case A: Prerequisites are confirmed, but Maintenance Window / Downtime is still needed
+        if not is_prereq_missing and is_window_missing:
+            mode_desc = "Planned Downtime Required" if act_def.execution_mode == "Offline" else "User Lockout Required"
+            response_text = (
+                f"✅ **Prerequisites Verified & Confirmed!**\n\n"
+                f"Great, all prerequisites for **{act_def.activity_name}** are confirmed.\n\n"
+                f"Because this operation runs in **{act_def.execution_mode} Mode** (`{mode_desc}`), we need your scheduled downtime/maintenance window before drafting the ticket for Administrator Approval.\n\n"
+                f"⏱️ **Action Required:**\n"
+                f"Please specify your **approved Downtime / Maintenance Window** (Date & Time) for this operation "
+                f"(e.g., *'Saturday 10:00 PM to 2:00 AM UTC'* or *'Tomorrow at 11:00 PM'*)."
+            )
+            return {"response_text": response_text}
+
+        # Case B: Maintenance Window is specified, but Prerequisites confirmation is still needed
+        if is_prereq_missing and not is_window_missing:
+            response_text = (
+                f"⏱️ **Maintenance Window Noted!**\n\n"
+                f"Thank you for providing your scheduled maintenance timeframe.\n\n"
+                f"Before we can generate your ticket draft for **{act_def.activity_name}**, please verify the mandatory prerequisites:\n\n"
+                f"**Mandatory Prerequisites Checklist:**\n{prereq_items}\n\n"
+                f"📋 **Action Required:**\n"
+                f"Have all of the above prerequisites been completed and verified? *(Please reply to confirm so we can draft your ticket.)*"
+            )
+            return {"response_text": response_text}
+
+        # Case C: Initial turn - Neither is confirmed yet, present full overview and checklist
         if act_def.execution_mode in ["Offline", "Hybrid"]:
             action_req = (
                 f"**Action Required:**\n"

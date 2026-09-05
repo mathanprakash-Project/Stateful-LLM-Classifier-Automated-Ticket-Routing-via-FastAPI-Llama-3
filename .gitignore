@@ -1,6 +1,11 @@
-.venv/
-venv/
-.env
-__pycache__/
 learn.md
 learn.pdf
+frontend/node_modules/
+frontend/.angular/
+frontend/dist/
+*.db
+*.sqlite3
+venv/
+.venv/
+__pycache__/
+.env

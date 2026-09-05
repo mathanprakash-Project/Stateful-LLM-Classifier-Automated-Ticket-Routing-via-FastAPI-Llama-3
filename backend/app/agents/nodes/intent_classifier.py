@@ -10,7 +10,7 @@ from typing import Any, Dict
 from app.agents.prompts.system_prompts import INTENT_CLASSIFIER_PROMPT
 from app.agents.state import AgentState
 from app.config.settings import settings
-from app.core.activity_registry import get_activity
+from app.core.activity_registry import get_activity, is_greeting_or_activity_overview
 from app.core.llm_client import call_ollama
 
 logger = logging.getLogger(__name__)
@@ -36,6 +36,7 @@ OUT_OF_SCOPE_KEYWORDS = [
 
 # Explicit IT / Technical keywords
 IT_KEYWORDS = [
+    "activity", "activities", "maintenance", "operations",
     "button", "page", "screen", "login", "form", "field", "dropdown", "ui", "layout", "validation", "submit",
     "application", "app", "version", "upgrade", "downgrade", "patch", "client", "transfer", "migrate", "data",
     "file", "upload", "download", "configuration", "error message", "not working", "broken", "missing",
@@ -73,18 +74,8 @@ def rule_based_intent_fallback(text: str, conversation_history: list = None) -> 
     if any(k in lower for k in ["change priority", "update draft", "edit title", "modify draft", "change category"]):
         return {"intent": "draft_modification", "activity_code": "UNKNOWN"}
     
-    # 3. Check explicit capability / activity list / scope inquiries and greetings on standalone first turn
-    scope_inquiry_keywords = [
-        "activity list", "what activities", "explain the activities", "explain activities",
-        "which activities", "list of activities", "what can you do", "what do you support",
-        "under ur scope", "under your scope", "what tickets", "services", "capabilities", "hello", "hi",
-        "hey", "good morning", "good afternoon", "who are you", "how can you help"
-    ]
-    is_standalone_greeting = (
-        any(k == lower or lower.startswith(k) for k in scope_inquiry_keywords) and
-        not any(w in full_lower for w in ["upgrade", "downgrade", "version", "patch", "transfer data", "client", "file", "ui", "broken", "issue"])
-    )
-    if is_standalone_greeting:
+    # 3. Check explicit capability / activity list / scope inquiries and greetings
+    if is_greeting_or_activity_overview(text):
         return {"intent": "general_query", "activity_code": "UNKNOWN"}
 
     # 4. Version keywords (performing version actions)
@@ -115,11 +106,8 @@ def rule_based_intent_fallback(text: str, conversation_history: list = None) -> 
     if has_it_keyword or any(w in full_lower for w in ["slow", "broken", "issue", "not working", "fails", "down", "glitch", "problem", "downtime", "prerequisite"]):
         return {"intent": "APPLICATION_UI", "activity_code": "APPLICATION_UI"}
 
-    # If ambiguous and short
-    if len(text.split()) < 4:
-        return {"intent": "general_query", "activity_code": "UNKNOWN"}
-
-    return {"intent": "NON_TECHNICAL", "activity_code": "NON_TECHNICAL"}
+    # Default fallback for general IT inquiries
+    return {"intent": "general_query", "activity_code": "UNKNOWN"}
 
 
 async def classify_intent_node(state: AgentState) -> Dict[str, Any]:
@@ -127,6 +115,33 @@ async def classify_intent_node(state: AgentState) -> Dict[str, Any]:
     messages = state.get("messages", [])
     existing_act = state.get("activity_code", "UNKNOWN")
     existing_intent = state.get("intent", "UNKNOWN")
+
+    # Fast deterministic check for greetings and activity overview requests
+    if is_greeting_or_activity_overview(user_msg):
+        return {
+            "intent": "general_query",
+            "activity_code": "UNKNOWN",
+            "technical_scope": "application",
+            "confidence": 1.0,
+            "ticket_eligible": False,
+            "restricted_operation": False,
+            "requires_admin_approval": False,
+            "requires_manager_review": False,
+        }
+
+    # Fast deterministic check for explicit out-of-scope non-technical queries
+    fast_rule = rule_based_intent_fallback(user_msg, messages)
+    if fast_rule["intent"] == "NON_TECHNICAL":
+        return {
+            "intent": "NON_TECHNICAL",
+            "activity_code": "NON_TECHNICAL",
+            "technical_scope": "non_technical",
+            "confidence": 1.0,
+            "ticket_eligible": False,
+            "restricted_operation": False,
+            "requires_admin_approval": False,
+            "requires_manager_review": False,
+        }
 
     result = {}
 
