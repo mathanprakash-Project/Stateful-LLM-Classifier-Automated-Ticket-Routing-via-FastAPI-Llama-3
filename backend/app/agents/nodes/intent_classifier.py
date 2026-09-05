@@ -94,6 +94,16 @@ def rule_based_intent_fallback(text: str, conversation_history: list = None) -> 
     if any(k in full_lower for k in ["ui change", "button broken", "layout issue", "form field"]):
         return {"intent": "APPLICATION_UI", "activity_code": "APPLICATION_UI"}
 
+    # Follow-up checks: If user is confirming prerequisites or specifying downtime in an existing session
+    from app.core.activity_registry import check_prereq_ack, check_downtime_window
+    if check_prereq_ack(text) or check_downtime_window(text):
+        if any(k in full_lower for k in ["version", "upgrade", "downgrade", "patch"]):
+            return {"intent": "APPLICATION_VERSION", "activity_code": "APPLICATION_VERSION"}
+        if any(k in full_lower for k in ["client", "transfer", "migrate"]):
+            return {"intent": "CLIENT_DATA_TRANSFER", "activity_code": "CLIENT_DATA_TRANSFER"}
+        if any(k in full_lower for k in ["file", "archive", "log"]):
+            return {"intent": "FILE_MANAGEMENT", "activity_code": "FILE_MANAGEMENT"}
+
     # 8. Out-of-scope non-IT topics check
     has_out_of_scope = any(re.search(rf"\b{re.escape(kw)}\b", full_lower) for kw in OUT_OF_SCOPE_KEYWORDS)
     has_it_keyword = any(re.search(rf"\b{re.escape(kw)}\b", full_lower) for kw in IT_KEYWORDS)
@@ -108,6 +118,50 @@ def rule_based_intent_fallback(text: str, conversation_history: list = None) -> 
 
     # Default fallback for general IT inquiries
     return {"intent": "general_query", "activity_code": "UNKNOWN"}
+
+
+def detect_session_active_activity(state: AgentState, user_msg: str, messages: list) -> str:
+    """
+    Determines if there is an active operational maintenance activity already established
+    in the ongoing conversation session.
+    """
+    # 1. Direct state activity code
+    act = state.get("activity_code")
+    if act and act not in ["UNKNOWN", "NON_TECHNICAL", "ActivityCode"]:
+        return act
+
+    # 2. Check intent if valid
+    intent = state.get("intent")
+    if intent in [
+        "APPLICATION_VERSION", "CLIENT_DATA_TRANSFER", "FILE_MANAGEMENT",
+        "APPLICATION_UI", "SERVER", "DATABASE", "NETWORK", "SECURITY", "OTHER_TECHNICAL"
+    ]:
+        return intent
+
+    # 3. Check extracted fields category
+    cat = (state.get("extracted_fields") or {}).get("category", "")
+    if "version" in cat.lower():
+        return "APPLICATION_VERSION"
+    if "client" in cat.lower() or "transfer" in cat.lower():
+        return "CLIENT_DATA_TRANSFER"
+    if "file" in cat.lower():
+        return "FILE_MANAGEMENT"
+    if "ui" in cat.lower():
+        return "APPLICATION_UI"
+
+    # 4. Check conversation history
+    all_user_msgs = [m.get("content", "") for m in messages if m.get("role") == "user"]
+    combined = " ".join(all_user_msgs).lower()
+    if any(k in combined for k in ["application version", "version upgrade", "upgrade application", "downgrade application", "runtime engine", "version maintenance"]):
+        return "APPLICATION_VERSION"
+    if any(k in combined for k in ["client data transfer", "transfer data", "client 100", "client 200", "migrate client"]):
+        return "CLIENT_DATA_TRANSFER"
+    if any(k in combined for k in ["file management", "housekeeping script", "archive logs"]):
+        return "FILE_MANAGEMENT"
+    if any(k in combined for k in ["ui change", "button broken", "layout issue"]):
+        return "APPLICATION_UI"
+
+    return "UNKNOWN"
 
 
 async def classify_intent_node(state: AgentState) -> Dict[str, Any]:
@@ -197,12 +251,13 @@ async def classify_intent_node(state: AgentState) -> Dict[str, Any]:
         result["activity_code"] = "APPLICATION_UI"
 
     # If an ongoing operational activity was already active in this session, keep it for follow-ups
-    # UNLESS the user asks a non-technical or out-of-scope query
-    if existing_act not in ["UNKNOWN", "NON_TECHNICAL", None] and result.get("intent") not in ["NON_TECHNICAL", "general_query"]:
-        explicit_topic_change = bool(re.search(r"\b(what activities|explain activities|activity list|hello|hi|hey|tkt-|leave|salary|hr)\b", user_msg.lower()))
+    # UNLESS the user asks a non-technical or out-of-scope query, or explicit topic change
+    ongoing_act = detect_session_active_activity(state, user_msg, messages)
+    if ongoing_act not in ["UNKNOWN", "NON_TECHNICAL"] and result.get("intent") != "NON_TECHNICAL":
+        explicit_topic_change = bool(re.search(r"\b(what activities|explain activities|activity list|hello|hi|hey|tkt-|leave|salary|hr|cancel|switch to|instead)\b", user_msg.lower()))
         if not explicit_topic_change:
-            result["intent"] = existing_act
-            result["activity_code"] = existing_act
+            result["intent"] = ongoing_act
+            result["activity_code"] = ongoing_act
 
     activity_code = result.get("activity_code", "UNKNOWN")
     activity_def = get_activity(activity_code)

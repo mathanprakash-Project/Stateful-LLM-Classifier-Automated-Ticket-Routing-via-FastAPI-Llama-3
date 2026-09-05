@@ -405,7 +405,25 @@ async def generate_response_node(state: AgentState) -> Dict[str, Any]:
         return {"response_text": SUPPORT_TEAM_ACTIVITIES_OVERVIEW_RESPONSE}
 
     # 5. Targeted Maintenance Operational Diagnostic (Interactive prerequisite & downtime checks)
-    act_code = state.get("activity_code", intent)
+    act_code = state.get("activity_code") or state.get("intent") or "UNKNOWN"
+    if act_code in ["UNKNOWN", "ActivityCode", None]:
+        cat_name = str(extracted.get("category", "")).lower()
+        if "version" in cat_name:
+            act_code = "APPLICATION_VERSION"
+        elif "client" in cat_name or "transfer" in cat_name:
+            act_code = "CLIENT_DATA_TRANSFER"
+        elif "file" in cat_name:
+            act_code = "FILE_MANAGEMENT"
+        elif "ui" in cat_name:
+            act_code = "APPLICATION_UI"
+        else:
+            all_text_lower = " ".join([m.get("content", "") for m in messages if m.get("role") == "user"]).lower()
+            if any(k in all_text_lower for k in ["application version", "version upgrade", "upgrade application", "downgrade application", "runtime engine", "version maintenance"]):
+                act_code = "APPLICATION_VERSION"
+            elif any(k in all_text_lower for k in ["client data transfer", "transfer data", "client 100", "client 200"]):
+                act_code = "CLIENT_DATA_TRANSFER"
+            elif any(k in all_text_lower for k in ["file management", "archive logs"]):
+                act_code = "FILE_MANAGEMENT"
     act_def = get_activity(act_code)
 
     if act_def and act_def.prerequisites:
@@ -428,19 +446,32 @@ async def generate_response_node(state: AgentState) -> Dict[str, Any]:
         # Case A: Prerequisites are confirmed, but Maintenance Window / Downtime is still needed
         if not is_prereq_missing and is_window_missing:
             mode_desc = "Planned Downtime Required" if act_def.execution_mode == "Offline" else "User Lockout Required"
+
+            # Check if prerequisites were already confirmed in a PRIOR turn
+            prior_user_msgs = [m.get("content", "") for m in messages if m.get("role") == "user"]
+            prior_had_prereq = check_prereq_ack(" ".join(prior_user_msgs))
+            user_just_confirmed = check_prereq_ack(last_user_msg)
+
+            if prior_had_prereq and user_just_confirmed:
+                intro = (
+                    f"✅ **Prerequisites Already Confirmed!**\n\n"
+                    f"We have already verified and logged your prerequisites for **{act_def.activity_name}**.\n\n"
+                    f"However, before our team can generate your ticket draft for Administrator Approval, we still need your **approved Downtime / Maintenance Window**."
+                )
+            else:
+                intro = (
+                    f"✅ **Prerequisites Verified & Confirmed!**\n\n"
+                    f"Thank you for confirming that all prerequisites for **{act_def.activity_name}** are complete and verified. Now, let's schedule your maintenance window."
+                )
+
             response_text = (
-                f"✅ **Prerequisites Verified & Confirmed!**\n\n"
-                f"Great, all prerequisites for **{act_def.activity_name}** are confirmed.\n\n"
-                f"Because this operation runs in **{act_def.execution_mode} Mode** (`{mode_desc}`), we need your scheduled downtime/maintenance window before drafting the ticket for Administrator Approval.\n\n"
-                f"Thank you for confirming that all prerequisites for **{act_def.activity_name}** are complete and verified. Now, let's move forward with scheduling your maintenance window.\n\n"
-                f"Because this operation runs in **{act_def.execution_mode} Mode** (`{mode_desc}`), we need your scheduled maintenance window before drafting the ticket for Administrator Approval.\n\n"
+                f"{intro}\n\n"
+                f"Because this operation runs in **{act_def.execution_mode} Mode** (`{mode_desc}`), specifying your planned maintenance timeframe is mandatory.\n\n"
                 f"⏱️ **Action Required:**\n"
-                f"Please specify your **approved Downtime / Maintenance Window** (Date & Time) for this operation "
-                f"(e.g., *'Saturday 10:00 PM to 2:00 AM UTC'* or *'Tomorrow at 11:00 PM'*)."
                 f"Please specify your **approved Downtime / Maintenance Window** in the following format:\n"
                 f"- **Format:** `DD/MM/YYYY HH:MM to HH:MM (Timezone)`\n"
                 f"- **Examples:** `15/09/2026 22:00 to 02:00 UTC` or `15/09/2026 10:00 PM to 02:00 AM IST`\n\n"
-                f"Once provided, our team will immediately prepare your official ticket draft!"
+                f"Once you provide the maintenance window, our team will immediately generate your official ticket draft!"
             )
             return {"response_text": response_text}
 
@@ -461,7 +492,6 @@ async def generate_response_node(state: AgentState) -> Dict[str, Any]:
             action_req = (
                 f"**Action Required:**\n"
                 f"1. **Prerequisites Status:** Have all of the above prerequisites been completed and verified? *(If any prerequisite is pending, please complete it before proceeding.)*\n"
-                f"2. **Downtime / Maintenance Window:** Please specify your approved maintenance window (date/time) for this operation."
                 f"2. **Downtime / Maintenance Window:** Please specify your approved maintenance window in the format `DD/MM/YYYY HH:MM to HH:MM (Timezone)` (e.g., `15/09/2026 22:00 to 02:00 UTC` or `15/09/2026 10:00 PM to 02:00 AM IST`)."
             )
             heading_title = f"### 🛠️ **{act_def.activity_name} — Prerequisites & Maintenance Window Verification**\n\n"

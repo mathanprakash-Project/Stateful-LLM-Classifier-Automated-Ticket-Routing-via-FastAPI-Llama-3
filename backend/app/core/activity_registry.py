@@ -369,8 +369,8 @@ def check_prereq_ack(text: str) -> bool:
     if re.search(r"\b(what are|explain|show|list)\s+prereq", lower):
         return False
     prereq_patterns = [
-        r"\bprereq(uisite)?s?\s*(done|completed|verified|checked|ok|ready|all done)\b",
-        r"\b(prereq|prerequisites|prerequisite)\b.*\b(done|yes|ok|completed|verified|ready)\b",
+        r"\bpre[\s\-_]?requ?is?it(e|ies|es)?s?\s*(done|completed|verified|checked|ok|ready|all done|confirmed|yes)\b",
+        r"\b(prereq|pre[\s\-_]?requ?is?it(e|ies|es)?s?)\b.*\b(done|yes|ok|completed|verified|ready|confirmed|checked)\b",
         r"\b(yes|done|completed|verified|ready|prepared|all done|all set|confirmed)\b",
     ]
     return any(re.search(pat, lower) for pat in prereq_patterns)

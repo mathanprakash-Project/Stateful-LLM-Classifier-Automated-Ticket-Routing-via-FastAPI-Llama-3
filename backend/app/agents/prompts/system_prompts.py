@@ -31,7 +31,8 @@ CRITICAL CLASSIFICATION RULES:
    - OTHER_TECHNICAL: 3rd-party API errors, middleware integration issues.
 
 5. Multi-Turn Diagnostic / Maintenance Follow-up:
-   - If the user is answering questions, confirming prerequisites ("yes", "done", "verified"), or providing a maintenance/downtime schedule for an ongoing operational activity, CLASSIFY with the ONGOING activity code (e.g. APPLICATION_VERSION, CLIENT_DATA_TRANSFER, APPLICATION_UI, FILE_MANAGEMENT). NEVER classify ongoing maintenance follow-ups as general_query or NON_TECHNICAL.
+   - If the user is answering questions, confirming prerequisites ("yes", "done", "verified", "prereq done", "yeah pre requistes done"), or providing a maintenance/downtime schedule for an ongoing operational activity, CLASSIFY with the ONGOING activity code (e.g. APPLICATION_VERSION, CLIENT_DATA_TRANSFER, APPLICATION_UI, FILE_MANAGEMENT).
+   - NEVER classify ongoing maintenance follow-ups, prerequisite confirmations, or schedule specifications as general_query, draft_modification, or NON_TECHNICAL.
 
 Respond strictly in valid JSON:
 {

@@ -53,6 +53,20 @@ def route_completeness(state: AgentState) -> Literal["generate_draft", "generate
     if user_role != "user":
         return "generate_response"
 
+    # Strict safety check:
+    # If the activity is APPLICATION_VERSION or CLIENT_DATA_TRANSFER,
+    # verify that downtime window is truly present before allowing draft generation!
+    act_code = state.get("activity_code") or state.get("intent") or "UNKNOWN"
+    cat_name = str((state.get("extracted_fields") or {}).get("category", "")).lower()
+    if act_code in ["APPLICATION_VERSION", "CLIENT_DATA_TRANSFER"] or any(k in cat_name for k in ["version", "transfer"]):
+        from app.core.activity_registry import check_downtime_window
+        messages = state.get("messages") or []
+        all_user_text = " ".join([m.get("content", "") for m in messages if m.get("role") == "user"])
+        if state.get("current_user_message"):
+            all_user_text += " " + state.get("current_user_message")
+        if not check_downtime_window(all_user_text):
+            return "generate_response"
+
     missing = state.get("missing_fields", [])
     if not missing:
         return "generate_draft"

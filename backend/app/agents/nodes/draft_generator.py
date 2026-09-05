@@ -84,13 +84,17 @@ async def generate_draft_node(state: AgentState) -> Dict[str, Any]:
         user_msgs.append(state.get("current_user_message"))
 
     from app.core.activity_registry import check_downtime_window
-    window_val = "Scheduled maintenance window verified."
+    window_val = None
     for umsg in reversed(user_msgs):
         if check_downtime_window(umsg):
             window_val = umsg.strip()
             break
-    if window_val == "Scheduled maintenance window verified." and user_msgs:
-        window_val = user_msgs[-1].strip()
+
+    if not window_val:
+        if act_def.downtime_required or act_def.execution_mode in ["Offline", "Hybrid"]:
+            window_val = "Scheduled maintenance window verification pending."
+        else:
+            window_val = "No downtime required (Online Mode)."
 
     draft = {
         "title": title,
