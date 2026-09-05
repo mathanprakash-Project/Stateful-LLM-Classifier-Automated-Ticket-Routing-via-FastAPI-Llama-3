@@ -389,6 +389,8 @@ def check_downtime_window(text: str) -> bool:
     lower = (text or "").lower()
     time_patterns = [
         r"\b\d{1,2}(:\d{2})?\s*(am|pm)\b",
+        r"\b\d{1,2}:\d{2}\s*(to|-)\s*\d{1,2}:\d{2}\b",
+        r"\b\d{1,2}:\d{2}\b",
         r"\b(utc|gmt|est|pst|ist|cst)\b",
         r"\b(saturday|sunday|monday|tuesday|wednesday|thursday|friday|weekend)\b",
         r"\b(midnight|tonight|tomorrow)\b",
@@ -397,5 +399,6 @@ def check_downtime_window(text: str) -> bool:
         r"\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b",
     ]
     return any(re.search(pat, lower) for pat in time_patterns)
+
 
 

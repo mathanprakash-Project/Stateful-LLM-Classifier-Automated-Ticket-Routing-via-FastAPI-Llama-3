@@ -430,11 +430,13 @@ async def generate_response_node(state: AgentState) -> Dict[str, Any]:
             mode_desc = "Planned Downtime Required" if act_def.execution_mode == "Offline" else "User Lockout Required"
             response_text = (
                 f"✅ **Prerequisites Verified & Confirmed!**\n\n"
-                f"Great, all prerequisites for **{act_def.activity_name}** are confirmed.\n\n"
-                f"Because this operation runs in **{act_def.execution_mode} Mode** (`{mode_desc}`), we need your scheduled downtime/maintenance window before drafting the ticket for Administrator Approval.\n\n"
+                f"Thank you for confirming that all prerequisites for **{act_def.activity_name}** are complete and verified. Now, let's move forward with scheduling your maintenance window.\n\n"
+                f"Because this operation runs in **{act_def.execution_mode} Mode** (`{mode_desc}`), we need your scheduled maintenance window before drafting the ticket for Administrator Approval.\n\n"
                 f"⏱️ **Action Required:**\n"
-                f"Please specify your **approved Downtime / Maintenance Window** (Date & Time) for this operation "
-                f"(e.g., *'Saturday 10:00 PM to 2:00 AM UTC'* or *'Tomorrow at 11:00 PM'*)."
+                f"Please specify your **approved Downtime / Maintenance Window** in the following format:\n"
+                f"- **Format:** `DD/MM/YYYY HH:MM to HH:MM (Timezone)`\n"
+                f"- **Examples:** `15/09/2026 22:00 to 02:00 UTC` or `15/09/2026 10:00 PM to 02:00 AM IST`\n\n"
+                f"Once provided, our team will immediately prepare your official ticket draft!"
             )
             return {"response_text": response_text}
 
@@ -455,7 +457,7 @@ async def generate_response_node(state: AgentState) -> Dict[str, Any]:
             action_req = (
                 f"**Action Required:**\n"
                 f"1. **Prerequisites Status:** Have all of the above prerequisites been completed and verified? *(If any prerequisite is pending, please complete it before proceeding.)*\n"
-                f"2. **Downtime / Maintenance Window:** Please specify your approved maintenance window (date/time) for this operation."
+                f"2. **Downtime / Maintenance Window:** Please specify your approved maintenance window in the format `DD/MM/YYYY HH:MM to HH:MM (Timezone)` (e.g., `15/09/2026 22:00 to 02:00 UTC` or `15/09/2026 10:00 PM to 02:00 AM IST`)."
             )
             heading_title = f"### 🛠️ **{act_def.activity_name} — Prerequisites & Maintenance Window Verification**\n\n"
         else:
