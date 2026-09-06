@@ -100,6 +100,7 @@ flowchart LR
 - **Offline & Hybrid Activities** (`Application Version Maintenance`, `Client Data Transfer`): The AI requires **both** Prerequisites Status verification and the Approved Maintenance Window date/time.
 - **Mandatory Field Governance**: `Title`, `Category`, `Priority`, and `Issue Description` are strictly mandatory before approval or submission.
 
+
 ---
 
 ## 🔄 5-Stage Ticket Lifecycle & Governance
