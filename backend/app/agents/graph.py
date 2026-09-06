@@ -24,7 +24,8 @@ def is_informational_query(msg: str) -> bool:
         "explain", "what is", "what does", "how does", "tell me about", "details of",
         "describe", "alone", "understand", "overview of", "walk me through", "guide on", "meaning of",
         "hybrid mode", "execution mode", "downtime are not", "is downtime", "why do we", "do we need downtime",
-        "why downtime", "difference between", "how it works", "what is lockout"
+        "why downtime", "difference between", "how it works", "what is lockout",
+        "step", "steps", "procedure", "how to create", "how do i create"
     ])
 
 
@@ -135,10 +136,10 @@ async def run_chat_turn(
         "activity_code": current_state.get("activity_code"),
         "extracted_fields": current_state.get("extracted_fields", {}),
         "missing_fields": current_state.get("missing_fields", []),
-        "draft": current_state.get("draft"),
+        "draft": None,
         "draft_id": current_state.get("draft_id"),
         "draft_status": current_state.get("draft_status"),
-        "needs_human_approval": current_state.get("needs_human_approval", False),
+        "needs_human_approval": False,
         "ticket_created": current_state.get("ticket_created"),
         "response_text": None,
         "error": None,

@@ -87,7 +87,16 @@ def rule_based_intent_fallback(text: str, conversation_history: list = None) -> 
         return {"intent": "CLIENT_DATA_TRANSFER", "activity_code": "CLIENT_DATA_TRANSFER"}
 
     # 6. File management
-    if any(k in full_lower for k in ["file management", "upload file", "download file", "interface logs"]):
+    file_management_keywords = [
+        "file management", "files management", "file mangement", "files mangements",
+        "file permission", "file permissions", "permission for the files", "permissions for the files",
+        "permissions for files", "permission for files", "permission change", "permissions change",
+        "change access and permissions", "file access", "directory permissions", "folder permissions",
+        "archive log", "archive logs", "archiving logs", "log cleanup", "cleanup script", "cleanup scripts",
+        "housekeeping script", "housekeeping scripts", "storage cleanup", "upload file", "download file",
+        "file sync", "file processing"
+    ]
+    if any(k in full_lower for k in file_management_keywords):
         return {"intent": "FILE_MANAGEMENT", "activity_code": "FILE_MANAGEMENT"}
 
     # 7. UI change
@@ -101,7 +110,7 @@ def rule_based_intent_fallback(text: str, conversation_history: list = None) -> 
             return {"intent": "APPLICATION_VERSION", "activity_code": "APPLICATION_VERSION"}
         if any(k in full_lower for k in ["client", "transfer", "migrate"]):
             return {"intent": "CLIENT_DATA_TRANSFER", "activity_code": "CLIENT_DATA_TRANSFER"}
-        if any(k in full_lower for k in ["file", "archive", "log"]):
+        if any(k in full_lower for k in ["file", "archive", "log", "permission"]):
             return {"intent": "FILE_MANAGEMENT", "activity_code": "FILE_MANAGEMENT"}
 
     # 8. Out-of-scope non-IT topics check
@@ -156,7 +165,11 @@ def detect_session_active_activity(state: AgentState, user_msg: str, messages: l
         return "APPLICATION_VERSION"
     if any(k in combined for k in ["client data transfer", "transfer data", "client 100", "client 200", "migrate client"]):
         return "CLIENT_DATA_TRANSFER"
-    if any(k in combined for k in ["file management", "housekeeping script", "archive logs"]):
+    if any(k in combined for k in [
+        "file management", "files management", "file mangement", "files mangements",
+        "file permission", "file permissions", "permission for the files", "permissions for the files",
+        "permission change", "file access", "directory permissions", "housekeeping script", "archive logs"
+    ]):
         return "FILE_MANAGEMENT"
     if any(k in combined for k in ["ui change", "button broken", "layout issue"]):
         return "APPLICATION_UI"
@@ -243,7 +256,12 @@ async def classify_intent_node(state: AgentState) -> Dict[str, Any]:
     elif any(k in user_lower for k in ["transfer data", "data migration", "client 100", "client 200", "copy client", "client sync"]):
         result["intent"] = "CLIENT_DATA_TRANSFER"
         result["activity_code"] = "CLIENT_DATA_TRANSFER"
-    elif any(k in user_lower for k in ["file management", "file upload", "file download", "archive logs"]):
+    elif any(k in user_lower for k in [
+        "file management", "files management", "file mangement", "files mangements",
+        "file permission", "file permissions", "permission for the files", "permissions for the files",
+        "permission change", "permissions change", "file access", "directory permissions",
+        "archive logs", "housekeeping script", "upload file", "download file"
+    ]):
         result["intent"] = "FILE_MANAGEMENT"
         result["activity_code"] = "FILE_MANAGEMENT"
     elif any(k in user_lower for k in ["ui change", "button broken", "layout issue", "form field"]):
@@ -256,6 +274,12 @@ async def classify_intent_node(state: AgentState) -> Dict[str, Any]:
     if ongoing_act not in ["UNKNOWN", "NON_TECHNICAL"] and result.get("intent") != "NON_TECHNICAL":
         explicit_topic_change = bool(re.search(r"\b(what activities|explain activities|activity list|hello|hi|hey|tkt-|leave|salary|hr|cancel|switch to|instead)\b", user_msg.lower()))
         if not explicit_topic_change:
+            result["intent"] = ongoing_act
+            result["activity_code"] = ongoing_act
+
+    # If user explicitly requests ticket creation in an active session, ensure ticket-eligible routing
+    if any(k in user_lower for k in ["create ticket", "open ticket", "raise ticket", "draft ticket", "make a ticket", "prerquities done", "prerequisites done"]):
+        if ongoing_act not in ["UNKNOWN", "NON_TECHNICAL"]:
             result["intent"] = ongoing_act
             result["activity_code"] = ongoing_act
 

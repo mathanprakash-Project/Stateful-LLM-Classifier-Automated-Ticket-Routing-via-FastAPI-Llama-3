@@ -58,7 +58,13 @@ def detect_specific_activity_in_query(query: str) -> Optional[str]:
     if any(k in q for k in ["versioning", "application version", "version upgrade", "version maintenance", "runtime engine", "version downgrade", "core binary", "core upgrade"]):
         return "APPLICATION_VERSION"
     # 3. File Management
-    if any(k in q for k in ["file management", "file upload", "housekeeping script", "log archive", "file processing", "file replacement", "archive script"]):
+    if any(k in q for k in [
+        "file management", "files management", "file mangement", "files mangements",
+        "file permission", "file permissions", "permission change", "permission for files",
+        "permissions for files", "permissions for the files", "file access", "directory permissions",
+        "file upload", "housekeeping script", "log archive", "archive logs", "file processing",
+        "file replacement", "archive script", "cleanup script"
+    ]):
         return "FILE_MANAGEMENT"
     # 4. UI Change and Issues
     if any(k in q for k in ["ui change", "ui issue", "ui activity", "screen layout", "ui bug", "ui error", "broken button", "frontend bug", "layout problem"]):
@@ -85,7 +91,8 @@ def is_explanation_request_query(query: str) -> bool:
     q = (query or "").lower().strip()
     explanation_keywords = [
         "explain", "what is", "what does", "how does", "tell me about", "details of",
-        "describe", "alone", "understand", "overview of", "walk me through", "guide on", "meaning of"
+        "describe", "alone", "understand", "overview of", "walk me through", "guide on", "meaning of",
+        "steps to", "steps for", "procedure for", "how to create", "how do i create"
     ]
     return any(k in q for k in explanation_keywords)
 
@@ -299,12 +306,55 @@ async def generate_response_node(state: AgentState) -> Dict[str, Any]:
                 return {"response_text": llm_res}
         return {"response_text": conceptual_reply}
 
-    # 2. Targeted check: Did the user ask to explain a single specific activity?
+    # 2. Targeted check: Did the user ask to explain a single specific activity or steps to create a ticket?
     is_explain_query = is_explanation_request_query(last_user_msg)
+    active_code_for_query = target_act_code or state.get("activity_code") or state.get("intent")
+    if not active_code_for_query or active_code_for_query in ["UNKNOWN", "general_query", None]:
+        cat_name = str((state.get("extracted_fields") or {}).get("category", "")).lower()
+        if "version" in cat_name:
+            active_code_for_query = "APPLICATION_VERSION"
+        elif "client" in cat_name or "transfer" in cat_name:
+            active_code_for_query = "CLIENT_DATA_TRANSFER"
+        elif "file" in cat_name:
+            active_code_for_query = "FILE_MANAGEMENT"
+        elif "ui" in cat_name:
+            active_code_for_query = "APPLICATION_UI"
+        else:
+            all_text_lower = " ".join([m.get("content", "") for m in messages if m.get("role") == "user"]).lower()
+            if any(k in all_text_lower for k in ["application version", "version upgrade", "upgrade application", "downgrade application", "runtime engine", "version maintenance"]):
+                active_code_for_query = "APPLICATION_VERSION"
+            elif any(k in all_text_lower for k in ["client data transfer", "transfer data", "client 100", "client 200"]):
+                active_code_for_query = "CLIENT_DATA_TRANSFER"
+            elif any(k in all_text_lower for k in [
+                "file management", "files management", "file mangement", "files mangements",
+                "file permission", "file permissions", "permission for the files", "permissions for the files",
+                "permission change", "file access", "archive logs", "housekeeping script"
+            ]):
+                active_code_for_query = "FILE_MANAGEMENT"
 
-    if target_act_code and (is_explain_query or "alone" in last_user_msg.lower()):
-        act_def = get_activity(target_act_code)
-        if act_def:
+    if active_code_for_query and (is_explain_query or "alone" in last_user_msg.lower()):
+        act_def = get_activity(active_code_for_query)
+        if act_def and act_def.activity_code != "UNKNOWN":
+            is_step_inquiry = any(k in last_user_msg.lower() for k in ["step", "steps", "procedure", "how to create", "how do i create"])
+            if is_step_inquiry:
+                downtime_step = (
+                    "2. **Specify Maintenance Window:** Provide your approved downtime window in format `DD/MM/YYYY HH:MM to HH:MM (Timezone)`.\n"
+                    if act_def.downtime_required or act_def.execution_mode == "Hybrid"
+                    else "2. **Specify Operation Details:** Provide target files, directories, access permissions, or scripts.\n"
+                )
+                return {
+                    "response_text": (
+                        f"### 📋 **Steps to Create a Ticket for {act_def.activity_name}** (`{act_def.activity_code}`)\n\n"
+                        f"**Execution Mode:** `{act_def.execution_mode}` | **Downtime Requirement:** `{act_def.downtime_description}`\n\n"
+                        f"Here is the simple, 4-step workflow to submit this request:\n\n"
+                        f"1. **Confirm Mandatory Prerequisites:** Verify that you have the required credentials, directory permissions, and test setups.\n"
+                        f"{downtime_step}"
+                        f"3. **Review AI Draft Card:** Our AI team will generate an interactive Ticket Draft Card for your review.\n"
+                        f"4. **Approve & Submit:** Click **Approve & Create Ticket** on the draft card to send the ticket directly to the Application Support queue.\n\n"
+                        f"---\n"
+                        f"💬 *If you are ready or your prerequisites are complete, reply with your request details and **'create ticket'** to generate your draft card immediately!*"
+                    )
+                }
             if settings.LLM_PROVIDER != "mock":
                 single_act_prompt = (
                     f"You are an Enterprise Application Support AI Specialist.\n"
@@ -476,7 +526,15 @@ async def generate_response_node(state: AgentState) -> Dict[str, Any]:
             return {"response_text": response_text}
 
         # Case B: Maintenance Window is specified, but Prerequisites confirmation is still needed
-        if is_prereq_missing and not is_window_missing:
+        # NOTE: Only applies for activities that require downtime / lockout AND where user actually specified a window!
+        requires_window = act_def.downtime_required or act_def.execution_mode == "Hybrid"
+        all_user_msgs = [m.get("content", "") for m in messages if m.get("role") == "user"]
+        if state.get("current_user_message"):
+            all_user_msgs.append(state.get("current_user_message"))
+        all_user_combined = " ".join(all_user_msgs)
+        has_window_specified = check_downtime_window(all_user_combined)
+
+        if requires_window and has_window_specified and is_prereq_missing:
             response_text = (
                 f"⏱️ **Maintenance Window Noted!**\n\n"
                 f"Thank you for providing your scheduled maintenance timeframe.\n\n"
@@ -487,7 +545,12 @@ async def generate_response_node(state: AgentState) -> Dict[str, Any]:
             )
             return {"response_text": response_text}
 
-        # Case C: Initial turn - Neither is confirmed yet, present full overview and checklist
+        # Case C: Initial turn or online activity needing prerequisites verification
+        detail_intro = ""
+        has_file_details = any(k in all_user_combined.lower() for k in ["permission", "permissions", "access", "script", "folder", "directory"])
+        if has_file_details and act_def.activity_code == "FILE_MANAGEMENT":
+            detail_intro = "✅ **Operation Details Noted:** Modifying application file access and permissions is supported under **File Management Operations** (`Online · No Downtime`).\n\n"
+
         if act_def.execution_mode in ["Offline", "Hybrid"]:
             action_req = (
                 f"**Action Required:**\n"
@@ -503,6 +566,7 @@ async def generate_response_node(state: AgentState) -> Dict[str, Any]:
             heading_title = f"### 🛠️ **{act_def.activity_name} — Prerequisites Verification**\n\n"
 
         response_text = (
+            f"{detail_intro}"
             f"{heading_title}"
             f"**Execution Mode:** `{act_def.execution_mode}` | **Downtime Requirement:** `{downtime_info}`\n\n"
             f"**Mandatory Prerequisites Checklist:**\n"

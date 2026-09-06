@@ -23,12 +23,18 @@ def is_text_out_of_scope(text: str) -> bool:
 
 
 def rule_based_extraction_fallback(text: str, current_fields: Dict[str, Any], history: list = None) -> Dict[str, Any]:
-    extracted = dict(current_fields or {})
+    from app.core.activity_registry import is_new_inquiry_start
     lower = text.lower()
     full_text = text
-    if history:
-        full_text = " ".join([m.get("content", "") for m in history if m.get("role") == "user"]) + " " + text
-    full_lower = full_text.lower()
+
+    if is_new_inquiry_start(text):
+        extracted = {}
+        full_lower = lower
+    else:
+        extracted = dict(current_fields or {})
+        if history:
+            full_text = " ".join([m.get("content", "") for m in history if m.get("role") == "user"]) + " " + text
+        full_lower = full_text.lower()
 
     # If the user input is out-of-scope noise, do NOT pollute technical fields
     if is_text_out_of_scope(text) and not any(w in lower for w in ["wifi", "airfiber", "vpn", "laptop", "pc", "network", "internet"]):
@@ -47,9 +53,17 @@ def rule_based_extraction_fallback(text: str, current_fields: Dict[str, Any], hi
     elif any(w in full_lower for w in ["transfer data", "client", "migrate client", "copy client", "client-to-client", "data transfer"]):
         extracted["category"] = "Client Data Transfer"
         extracted["subcategory"] = "Data Migration"
-    elif any(w in full_lower for w in ["file", "upload", "download", "replace", "interface logs"]):
+    elif any(w in full_lower for w in [
+        "file", "files", "permission", "permissions", "access", "upload", "download", "replace",
+        "interface logs", "housekeeping", "archive log", "archive logs"
+    ]):
         extracted["category"] = "File Management"
-        extracted["subcategory"] = "File Upload Issue"
+        if any(w in full_lower for w in ["permission", "permissions", "access", "chmod"]):
+            extracted["subcategory"] = "File Permissions / Access"
+        elif any(w in full_lower for w in ["archive", "cleanup", "housekeeping"]):
+            extracted["subcategory"] = "Log Archiving & Cleanup"
+        else:
+            extracted["subcategory"] = "File Operations"
     elif any(w in full_lower for w in ["server", "cpu", "memory", "deployment"]):
         extracted["category"] = "Server / Infrastructure"
         extracted["subcategory"] = "Server Down"
@@ -88,6 +102,10 @@ def rule_based_extraction_fallback(text: str, current_fields: Dict[str, Any], hi
             extracted["title"] = "Application Version Upgrade Maintenance"
         elif "transfer" in full_lower or "client" in full_lower:
             extracted["title"] = "Client Data Transfer Request"
+        elif any(w in full_lower for w in ["permission", "permissions", "access"]) and any(w in full_lower for w in ["file", "files"]):
+            extracted["title"] = "Update Application File Permissions"
+        elif any(w in full_lower for w in ["file", "files", "archive", "log"]):
+            extracted["title"] = "File Management Operations"
         elif "airfiber" in full_lower or "airtel" in full_lower:
             extracted["title"] = "Airtel AirFiber Unstable Connection"
         else:
@@ -106,14 +124,20 @@ def rule_based_extraction_fallback(text: str, current_fields: Dict[str, Any], hi
 
 
 async def extract_info_node(state: AgentState) -> Dict[str, Any]:
+    from app.core.activity_registry import is_new_inquiry_start
     current_fields = state.get("extracted_fields", {})
     user_msg = state.get("current_user_message", "")
-    
-    # Filter out obvious non-IT messages from history sent to LLM
-    clean_history = [
-        m for m in state.get("messages", [])[-6:]
-        if not is_text_out_of_scope(m.get("content", ""))
-    ]
+
+    if is_new_inquiry_start(user_msg):
+        current_fields = {}
+        clean_history = []
+    else:
+        # Filter out obvious non-IT messages from history sent to LLM
+        clean_history = [
+            m for m in state.get("messages", [])[-6:]
+            if not is_text_out_of_scope(m.get("content", ""))
+        ]
+
     history_text = "\n".join(
         f"{m.get('role', 'user')}: {m.get('content', '')}" for m in clean_history
     )

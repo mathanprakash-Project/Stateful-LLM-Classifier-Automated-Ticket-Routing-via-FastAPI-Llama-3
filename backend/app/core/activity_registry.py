@@ -301,10 +301,18 @@ def get_ticket_eligible_activities() -> list[ActivityDefinition]:
 SUPPORT_TEAM_ACTIVITIES_OVERVIEW_RESPONSE = (
     "👋 Hello! We're your Enterprise Application Support AI Team.\n\n"
     "We are here to assist you with our 4 supported technical application activities:\n\n"
-    "🖥️ Application UI Maintenance (Online · No Downtime) — Interface adaptations, layout adjustments, and screen error fixes.\n"
-    "📁 File Management Operations (Online · No Downtime) — Scheduled archiving scripts, storage cleanup, and file synchronization.\n"
-    "🔄 Client Data Transfer (Hybrid · User Lockout) — Tenant data synchronization and client-to-client migration.\n"
-    "⚙️ Application Version Maintenance (Offline · Planned Downtime) — Core runtime version upgrades, binary deployments, and patches.\n\n"
+    "🖥️ **Application UI Maintenance** (`Online · No Downtime`)\n"
+    "- **What it is:** Customizing user interfaces, modifying fields, and fixing frontend screen/button errors.\n"
+    "- **How it works:** Changes deploy live in real-time with zero business interruption and no system restart.\n\n"
+    "📁 **File Management Operations** (`Online · No Downtime`)\n"
+    "- **What it is:** Running, scheduling, and monitoring background housekeeping scripts and archiving logs.\n"
+    "- **How it works:** Cleanup scripts run seamlessly in the background while everyday business operations continue.\n\n"
+    "🔄 **Client Data Transfer** (`Hybrid · User Lockout Required`)\n"
+    "- **What it is:** Replicating configuration, master records, and tenant data between environments or clients.\n"
+    "- **How it works:** System servers remain powered on, but active user logins in participating environments are temporarily locked to prevent data corruption during bulk transfer.\n\n"
+    "⚙️ **Application Version Maintenance** (`Offline · Planned Downtime`)\n"
+    "- **What it is:** Upgrading or patching core application runtime engines, background executables, and binaries.\n"
+    "- **How it works:** Because running engine files are locked by the OS, services are temporarily stopped during an approved maintenance window to safely apply upgrades.\n\n"
     "💬 Please describe your specific maintenance request or technical issue, and our team will guide you through prerequisites, downtime verification, and ticket drafting!"
 )
 
@@ -322,37 +330,41 @@ def is_greeting_or_activity_overview(text: str) -> bool:
     cleaned = re.sub(r"[^\w\s]", "", q).strip()
 
     # Exact standalone greetings
-    greetings = {"hello", "hi", "hey", "good morning", "good afternoon", "good evening", "greetings", "help", "who are you"}
+    greetings = {"hello", "hi", "hey", "good morning", "good afternoon", "good evening", "greetings", "who are you"}
     if cleaned in greetings:
         return True
 
     # Greeting prefixes like "hello team", "hi assistant"
     if any(cleaned.startswith(g + " ") for g in ["hello", "hi", "hey", "good morning", "good afternoon", "good evening"]):
-        action_keywords = ["upgrade", "downgrade", "version", "patch", "transfer", "client", "file", "ui", "broken", "issue", "bug", "error", "fail", "slow", "tkt-"]
+        action_keywords = ["upgrade", "downgrade", "version", "patch", "transfer", "client", "file", "permission", "ui", "broken", "issue", "bug", "error", "fail", "slow", "tkt-"]
         if not any(w in cleaned for w in action_keywords):
             return True
 
-    # Check for queries about activities / capabilities / scope / what we do
+    # Exclude queries that are clearly discussing specific operations, tickets, or technical tasks
+    task_keywords = [
+        "file", "files", "permission", "permissions", "access", "script", "scripts",
+        "version", "upgrade", "patch", "downgrade", "transfer", "client", "ui", "button",
+        "layout", "screen", "error", "bug", "create", "ticket", "step", "steps", "prereq", "done"
+    ]
+    if any(w in cleaned for w in task_keywords):
+        return False
+
+    # Check for queries specifically asking for the list, overview, or scope of activities
     activity_inquiry_patterns = [
-        r"\bactivit(y|ies)\b",
+        r"\b(list|overview|summary|all|what are the)\b.*\bactivit(y|ies)\b",
+        r"\bactivit(y|ies)\b.*\b(list|overview|summary|options)\b",
+        r"\bwhat (activities|services|operations) (do you|can you|are)\b",
+        r"\b(show|give|tell me|explain)\b.*\b(list|overview|summary)\b.*\bactivit(y|ies)\b",
         r"\bcapabilit(y|ies)\b",
-        r"\bservices?\b",
         r"\bwhat (can|do) you do\b",
         r"\bwhat do you support\b",
         r"\bunder your scope\b",
         r"\bhow can you help\b",
-        r"\bshort descr[i|p]ption\b",
-        r"\b(list|overview|summary|description) of (the )?activities\b",
+        r"\bshort descr[i|p]ption of (the )?activities\b",
+        r"\blist activities\b",
+        r"\bsupported activities\b",
     ]
     if any(re.search(pat, cleaned) for pat in activity_inquiry_patterns):
-        # Exclude active ticket actions (e.g. "I want to start a client data transfer" or "upgrade application version")
-        active_request_phrases = [
-            "start", "run", "execute", "create ticket", "open ticket", "raise ticket",
-            "upgrade to", "downgrade to", "patch to", "transfer from client", "upload file",
-            "download file", "button broken", "screen not loading", "error in", "failed to"
-        ]
-        if any(p in cleaned for p in active_request_phrases):
-            return False
         return True
 
     return False
@@ -361,19 +373,35 @@ def is_greeting_or_activity_overview(text: str) -> bool:
 def check_prereq_ack(text: str) -> bool:
     """Check if the user confirmed that prerequisites are done/completed/verified."""
     import re
-    lower = (text or "").lower()
+    lower = (text or "").lower().strip()
+    if not lower:
+        return False
     # If explicitly stated as not done or pending
     if re.search(r"\b(not yet|not done|pending|incomplete|haven't|havent|in progress|not completed|not verified)\b", lower):
         return False
     # If user is asking a question about prerequisites
     if re.search(r"\b(what are|explain|show|list)\s+prereq", lower):
         return False
-    prereq_patterns = [
-        r"\bpre[\s\-_]?requ?is?it(e|ies|es)?s?\s*(done|completed|verified|checked|ok|ready|all done|confirmed|yes)\b",
-        r"\b(prereq|pre[\s\-_]?requ?is?it(e|ies|es)?s?)\b.*\b(done|yes|ok|completed|verified|ready|confirmed|checked)\b",
-        r"\b(yes|done|completed|verified|ready|prepared|all done|all set|confirmed)\b",
-    ]
-    return any(re.search(pat, lower) for pat in prereq_patterns)
+
+    # Check for explicit prerequisite confirmation (including common typos like prerquities, prerequistes)
+    if re.search(r"\b(pre[\s\-_]?requ?is?it(e|ies|es)?s?|prerquities|prereqs?)\b.*\b(done|completed|verified|checked|ok|ready|all done|confirmed|yes|complete)\b", lower):
+        return True
+    if re.search(r"\b(done|completed|verified|checked|ready|confirmed|complete)\b.*\b(pre[\s\-_]?requ?is?it(e|ies|es)?s?|prerquities|prereqs?)\b", lower):
+        return True
+    if re.search(r"\b(all\s+(items|requirements|prerequisites|prereqs)\s+(are\s+)?(done|completed|verified|checked))\b", lower):
+        return True
+
+    # Standalone affirmations (exact short message like "yes", "yeah", "done", "prerequisites done", "all verified")
+    cleaned = re.sub(r"[^\w\s]", "", lower).strip()
+    standalone_confirmations = {
+        "yes", "yeah", "yep", "yup", "done", "all done", "completed", "verified",
+        "confirmed", "ready", "all set", "yes done", "yeah done", "yes verified",
+        "confirmed done", "prereq done", "prereqs done", "prerequisites done", "prerquities done"
+    }
+    if cleaned in standalone_confirmations:
+        return True
+
+    return False
 
 
 def is_prereq_explicitly_pending(text: str) -> bool:
@@ -399,6 +427,28 @@ def check_downtime_window(text: str) -> bool:
         r"\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b",
     ]
     return any(re.search(pat, lower) for pat in time_patterns)
+
+
+def is_new_inquiry_start(text: str) -> bool:
+    """Check if the user's message is an initial inquiry or starting a new activity topic."""
+    lower = (text or "").lower().strip()
+    if not lower:
+        return False
+    patterns = [
+        "help me out in", "help me out with", "help me with", "help with", "i need help",
+        "i want to", "can you help me with", "can u help me", "how do i",
+        "activity i need", "activity to create", "i need to create ticket for",
+        "create a ticket for", "create ticket for", "open a ticket for", "open ticket for"
+    ]
+    if any(p in lower for p in patterns):
+        return True
+    act_mentions = [
+        "file management activity", "files management activity", "files mangements activty",
+        "application versioning activity", "client data transfer activity", "application ui maintenance activity"
+    ]
+    if any(m in lower for m in act_mentions):
+        return True
+    return False
 
 
 

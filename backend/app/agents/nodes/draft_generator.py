@@ -37,6 +37,12 @@ async def generate_draft_node(state: AgentState) -> Dict[str, Any]:
         else:
             act_code = "APPLICATION_UI"
 
+    messages = state.get("messages", [])
+    all_user_text = " ".join([m.get("content", "") for m in messages if m.get("role") == "user"])
+    if state.get("current_user_message"):
+        all_user_text += " " + state.get("current_user_message")
+    all_user_lower = all_user_text.lower()
+
     # Map static activity titles and mode-based default priorities
     if act_code == "APPLICATION_VERSION":
         category_name = "Application Version Maintenance"
@@ -50,8 +56,15 @@ async def generate_draft_node(state: AgentState) -> Dict[str, Any]:
         mode_priority = "high"  # Hybrid mode -> high
     elif act_code == "FILE_MANAGEMENT":
         category_name = "File Management"
-        subcategory_name = "File Operations"
-        title = "File Management Operations"
+        if any(k in all_user_lower for k in ["permission", "permissions", "access", "chmod"]):
+            subcategory_name = "File Permissions / Access"
+            title = "File Management — Update File Permissions"
+        elif any(k in all_user_lower for k in ["archive", "cleanup", "housekeeping"]):
+            subcategory_name = "Log Archiving & Cleanup"
+            title = "File Management — Housekeeping & Archiving"
+        else:
+            subcategory_name = "File Operations"
+            title = "File Management Operations"
         mode_priority = "medium"  # Online mode -> medium
     else:
         act_code = "APPLICATION_UI"
@@ -59,11 +72,6 @@ async def generate_draft_node(state: AgentState) -> Dict[str, Any]:
         subcategory_name = "UI Bug"
         title = "Application UI Maintenance"
         mode_priority = "medium"  # Online mode -> medium
-    messages = state.get("messages", [])
-    all_user_text = " ".join([m.get("content", "") for m in messages if m.get("role") == "user"])
-    if state.get("current_user_message"):
-        all_user_text += " " + state.get("current_user_message")
-    all_user_lower = all_user_text.lower()
 
     explicit_prio = None
     if any(k in all_user_lower for k in ["priority critical", "priority: critical", "priority is critical", "priority=critical"]):
