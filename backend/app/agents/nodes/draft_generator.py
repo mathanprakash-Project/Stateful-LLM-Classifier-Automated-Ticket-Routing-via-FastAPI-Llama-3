@@ -91,11 +91,16 @@ async def generate_draft_node(state: AgentState) -> Dict[str, Any]:
     if state.get("current_user_message"):
         user_msgs.append(state.get("current_user_message"))
 
+    import re
     from app.core.activity_registry import check_downtime_window
     window_val = None
     for umsg in reversed(user_msgs):
         if check_downtime_window(umsg):
-            window_val = umsg.strip()
+            m_win = re.search(r"(downtime\s*(can\s*be|is|:)?\s*[\w\d\s/:–-]+|\d{1,2}[/-]\d{1,2}[/-]\d{2,4}.*)", umsg, re.IGNORECASE)
+            if m_win:
+                window_val = m_win.group(0).strip()
+            else:
+                window_val = umsg.strip()
             break
 
     if not window_val:

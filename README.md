@@ -1,10 +1,10 @@
-# 🚀 SupportHub AI — Autonomous IT Support & Operations Platform
+﻿# ≡ƒÜÇ SupportHub AI ΓÇö Autonomous IT Support & Operations Platform
 
 An enterprise-grade, autonomous IT support triage and application lifecycle management platform powered by **FastAPI**, **LangGraph Multi-Turn Diagnostic Agents**, **PostgreSQL**, **Ollama LLMs**, and a modern **Angular 22** executive frontend with a Corona Dark design system.
 
 ---
 
-## 📑 Table of Contents
+## ≡ƒôæ Table of Contents
 1. [Platform Architecture & System Workflow](#-platform-architecture--system-workflow)
 2. [Core Application Activities & Execution Modes](#-core-application-activities--execution-modes)
 3. [Autonomous AI Diagnostic Triage (LangGraph)](#-autonomous-ai-diagnostic-triage-langgraph)
@@ -19,7 +19,7 @@ An enterprise-grade, autonomous IT support triage and application lifecycle mana
 
 ---
 
-## 🏗️ Platform Architecture & System Workflow
+## ≡ƒÅù∩╕Å Platform Architecture & System Workflow
 
 ```mermaid
 flowchart TD
@@ -61,7 +61,7 @@ flowchart TD
 
 ---
 
-## 🎯 Core Application Activities & Execution Modes
+## ≡ƒÄ» Core Application Activities & Execution Modes
 
 SupportHub AI strictly standardizes enterprise ticket management into **4 core Application Activities**. Each activity is governed by its technical execution mode, downtime requirements, default priorities, and static naming conventions:
 
@@ -77,7 +77,7 @@ SupportHub AI strictly standardizes enterprise ticket management into **4 core A
 
 ---
 
-## 🤖 Autonomous AI Diagnostic Triage (LangGraph)
+## ≡ƒñû Autonomous AI Diagnostic Triage (LangGraph)
 
 The AI Agent utilizes a stateful **LangGraph** execution pipeline:
 
@@ -103,7 +103,7 @@ flowchart LR
 
 ---
 
-## 🔄 5-Stage Ticket Lifecycle & Governance
+## ≡ƒöä 5-Stage Ticket Lifecycle & Governance
 
 Every ticket moves through an auditable, five-stage operational lifecycle:
 
@@ -120,18 +120,18 @@ stateDiagram-v2
     Archived --> Stage2_Governance: 1-Click Renewal
 ```
 
-1. **Stage 1 — AI Diagnostic & Prerequisites**: Real-time multi-turn triage collecting prerequisites and metadata.
-2. **Stage 2 — Specialist Assignment & Governance**: Admins and Managers review restricted maintenance operations, route requests, or assign employees.
-3. **Stage 3 — Engineering Work in Progress**: Support engineers execute tasks, log operational updates, and attach completion notes.
-4. **Stage 4 — Operational Resolution & Verification**: Activity verified and marked as `resolved`. Requesters receive instant alerts to review the completion.
-5. **Stage 5 — Finalized, Reopenable (3-Attempt Cap) & Retention**:
+1. **Stage 1 ΓÇö AI Diagnostic & Prerequisites**: Real-time multi-turn triage collecting prerequisites and metadata.
+2. **Stage 2 ΓÇö Specialist Assignment & Governance**: Admins and Managers review restricted maintenance operations, route requests, or assign employees.
+3. **Stage 3 ΓÇö Engineering Work in Progress**: Support engineers execute tasks, log operational updates, and attach completion notes.
+4. **Stage 4 ΓÇö Operational Resolution & Verification**: Activity verified and marked as `resolved`. Requesters receive instant alerts to review the completion.
+5. **Stage 5 ΓÇö Finalized, Reopenable (3-Attempt Cap) & Retention**:
    - Requesters can confirm and close the ticket.
    - Requesters can **reopen up to 3 times** with mandatory reasoning and safety policy warnings.
    - Tickets are retained for **2 months**, after which they move to **Archived** status with 1-click renewal.
 
 ---
 
-## 🔔 Real-Time Notifications & Dedicated Ticket Status Tracker
+## ≡ƒöö Real-Time Notifications & Dedicated Ticket Status Tracker
 
 ### 1. Instant Proactive Alerts (SSE)
 - **Employee Resolution Toast**: When an engineer resolves a ticket, a top-right notification toast is immediately emitted.
@@ -146,7 +146,7 @@ To prevent the main dashboard from becoming congested when users submit multiple
 
 ---
 
-## 👥 Role-Based Access Control & User Directory
+## ≡ƒæÑ Role-Based Access Control & User Directory
 
 SupportHub AI includes **13 pre-seeded accounts** across 4 corporate tiers. Default password for all demo accounts: **`password123`**.
 
@@ -171,7 +171,7 @@ SupportHub AI includes **13 pre-seeded accounts** across 4 corporate tiers. Defa
 
 ---
 
-## 💻 Tech Stack
+## ≡ƒÆ╗ Tech Stack
 
 - **Backend**:
   - Python 3.11+
@@ -191,7 +191,7 @@ SupportHub AI includes **13 pre-seeded accounts** across 4 corporate tiers. Defa
 
 ---
 
-## 🚀 Quick Start with Docker
+## ≡ƒÜÇ Quick Start with Docker
 
 ### Prerequisites
 - [Docker Desktop](https://www.docker.com/) installed and running.
@@ -206,14 +206,14 @@ docker compose up -d --build
 ```
 
 ### 2. Access the Application
-- 🌐 **Web Application**: [http://localhost:3000](http://localhost:3000)
-- 📊 **Ticket Status Tracker**: [http://localhost:3000/ticket-status](http://localhost:3000/ticket-status)
-- 📚 **Swagger API Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
-- 🩺 **Health Check**: [http://localhost:8000/health](http://localhost:8000/health)
+- ≡ƒîÉ **Web Application**: [http://localhost:3000](http://localhost:3000)
+- ≡ƒôè **Ticket Status Tracker**: [http://localhost:3000/ticket-status](http://localhost:3000/ticket-status)
+- ≡ƒôÜ **Swagger API Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
+- ≡ƒ⌐║ **Health Check**: [http://localhost:8000/health](http://localhost:8000/health)
 
 ---
 
-## 🛠️ Local Development Setup
+## ≡ƒ¢á∩╕Å Local Development Setup
 
 ### 1. Backend Setup with `uv`
 ```bash
@@ -242,7 +242,7 @@ npm start
 
 ---
 
-## 🧪 Automated Testing & Verification
+## ≡ƒº¬ Automated Testing & Verification
 
 Run the comprehensive automated test suite covering RBAC, state machine transitions, AI triage, prompt guardrails, and priority mappings:
 
@@ -257,7 +257,7 @@ python scratch/test_all_priorities.py
 
 ---
 
-## 📡 REST API Documentation
+## ≡ƒôí REST API Documentation
 
 | Method | Endpoint | Description |
 | :--- | :--- | :--- |

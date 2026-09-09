@@ -71,65 +71,44 @@ def check_completeness_node(state: AgentState) -> Dict[str, Any]:
     curr_msg = state.get("current_user_message", "")
     is_initial_start = is_new_inquiry_start(curr_msg)
 
+    # Determine user messages that belong to the current active inquiry
+    if is_initial_start:
+        inquiry_user_msgs = [curr_msg]
+    else:
+        # Find the start of the current inquiry in messages
+        inquiry_start_idx = 0
+        for idx, msg in enumerate(messages):
+            if msg.get("role") == "user":
+                c = msg.get("content", "")
+                if is_new_inquiry_start(c):
+                    inquiry_start_idx = idx
+            elif msg.get("role") == "assistant":
+                if msg.get("message_type") in ["ticket_draft", "ticket_confirmation"]:
+                    inquiry_start_idx = idx + 1
+
+        inquiry_user_msgs = [
+            m.get("content", "") for m in messages[inquiry_start_idx:]
+            if m.get("role") == "user"
+        ]
+        if curr_msg:
+            inquiry_user_msgs.append(curr_msg)
+
     if act_def and act_def.prerequisites:
-        # Check if user has answered the prerequisite status
-        if is_initial_start:
-            # On an initial inquiry (e.g. "help me out in files mangements activty"),
-            # prerequisites are NOT yet answered unless the message explicitly confirms them
-            has_prereq_ack = check_prereq_ack(curr_msg)
+        from app.core.activity_registry import is_prereq_explicitly_pending
+        # If the user explicitly stated in their latest message that prerequisites are NOT done / pending
+        if is_prereq_explicitly_pending(curr_msg):
+            has_prereq_ack = False
         else:
-            if check_prereq_ack(curr_msg):
-                has_prereq_ack = True
-            else:
-                # Find the most recent assistant message presenting the prerequisites checklist
-                last_prereq_prompt_idx = -1
-                for idx, msg in enumerate(messages):
-                    if msg.get("role") == "assistant":
-                        c = msg.get("content", "").lower()
-                        if any(k in c for k in ["prerequisite", "prerequisites", "checklist"]):
-                            last_prereq_prompt_idx = idx
-                if last_prereq_prompt_idx != -1:
-                    subsequent = [
-                        m.get("content", "") for m in messages[last_prereq_prompt_idx + 1:]
-                        if m.get("role") == "user"
-                    ]
-                    has_prereq_ack = any(check_prereq_ack(m) for m in subsequent)
-                else:
-                    has_prereq_ack = False
+            has_prereq_ack = any(check_prereq_ack(m) for m in inquiry_user_msgs)
 
         if not has_prereq_ack:
             missing_fields.append("prerequisites_status")
 
         # Check if user has specified downtime / maintenance window
         if act_def.downtime_required or act_def.execution_mode == "Hybrid":
-            if is_initial_start:
-                has_downtime_window = check_downtime_window(curr_msg)
-            else:
-                if check_downtime_window(curr_msg):
-                    has_downtime_window = True
-                else:
-                    last_window_prompt_idx = -1
-                    for idx, msg in enumerate(messages):
-                        if msg.get("role") == "assistant":
-                            c = msg.get("content", "").lower()
-                            if any(k in c for k in ["maintenance window", "downtime", "lockout"]):
-                                last_window_prompt_idx = idx
-                    if last_window_prompt_idx != -1:
-                        subsequent_w = [
-                            m.get("content", "") for m in messages[last_window_prompt_idx + 1:]
-                            if m.get("role") == "user"
-                        ]
-                        has_downtime_window = any(check_downtime_window(m) for m in subsequent_w)
-                    else:
-                        has_downtime_window = False
-
+            has_downtime_window = any(check_downtime_window(m) for m in inquiry_user_msgs)
             if not has_downtime_window:
                 missing_fields.append("maintenance_window")
-
-    # Hard guard for APPLICATION_VERSION and CLIENT_DATA_TRANSFER
-    if act_code in ["APPLICATION_VERSION", "CLIENT_DATA_TRANSFER"] or (act_def and (act_def.downtime_required or act_def.execution_mode == "Hybrid")):
-        if is_initial_start and not check_downtime_window(curr_msg) and "maintenance_window" not in missing_fields:
-            missing_fields.append("maintenance_window")
 
     # Multi-turn diagnostic check for general tickets:
     # If the user only sent a single brief message, prompt for diagnostic clarification.

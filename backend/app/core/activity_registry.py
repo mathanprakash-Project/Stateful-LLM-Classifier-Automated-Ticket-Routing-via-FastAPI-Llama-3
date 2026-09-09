@@ -383,10 +383,14 @@ def check_prereq_ack(text: str) -> bool:
     if re.search(r"\b(what are|explain|show|list)\s+prereq", lower):
         return False
 
-    # Check for explicit prerequisite confirmation (including common typos like prerquities, prerequistes)
-    if re.search(r"\b(pre[\s\-_]?requ?is?it(e|ies|es)?s?|prerquities|prereqs?)\b.*\b(done|completed|verified|checked|ok|ready|all done|confirmed|yes|complete)\b", lower):
+    # Check for explicit prerequisite confirmation with robust pattern matching for typos:
+    # Matches prereq, prereqs, prerequisites, prerequistes, pre requists, prerquities, prerquisites, etc.
+    prereq_pat = r"(pre[\s\-_]?(req\w*|rqu\w*))"
+    confirm_pat = r"(done|completed|verified|checked|ok|ready|all done|confirmed|yes|complete|finished)"
+
+    if re.search(rf"\b{prereq_pat}\b.*\b{confirm_pat}\b", lower):
         return True
-    if re.search(r"\b(done|completed|verified|checked|ready|confirmed|complete)\b.*\b(pre[\s\-_]?requ?is?it(e|ies|es)?s?|prerquities|prereqs?)\b", lower):
+    if re.search(rf"\b{confirm_pat}\b.*\b{prereq_pat}\b", lower):
         return True
     if re.search(r"\b(all\s+(items|requirements|prerequisites|prereqs)\s+(are\s+)?(done|completed|verified|checked))\b", lower):
         return True
@@ -396,7 +400,8 @@ def check_prereq_ack(text: str) -> bool:
     standalone_confirmations = {
         "yes", "yeah", "yep", "yup", "done", "all done", "completed", "verified",
         "confirmed", "ready", "all set", "yes done", "yeah done", "yes verified",
-        "confirmed done", "prereq done", "prereqs done", "prerequisites done", "prerquities done"
+        "confirmed done", "prereq done", "prereqs done", "prerequisites done", "prerquities done",
+        "prerequistes done", "prerequistes completed", "prerequisites completed"
     }
     if cleaned in standalone_confirmations:
         return True
@@ -407,8 +412,14 @@ def check_prereq_ack(text: str) -> bool:
 def is_prereq_explicitly_pending(text: str) -> bool:
     """Check if the user explicitly stated that prerequisites are NOT yet done or are pending."""
     import re
-    lower = (text or "").lower()
-    return bool(re.search(r"\b(not yet|not done|pending|incomplete|haven't|havent|in progress|not completed|not verified)\b", lower))
+    lower = (text or "").lower().strip()
+    if re.search(r"^\s*(no|not yet|not done|pending|incomplete)\s*$", lower):
+        return True
+    if re.search(r"\b(pre[\s\-_]?(req\w*|rqu\w*)|backups?|items?)\b.*\b(not yet|not done|pending|incomplete|haven't|havent|not completed|not verified)\b", lower):
+        return True
+    if re.search(r"\b(not yet|not done|pending|incomplete|haven't|havent|not completed|not verified)\b.*\b(pre[\s\-_]?(req\w*|rqu\w*)|backups?|items?)\b", lower):
+        return True
+    return False
 
 
 def check_downtime_window(text: str) -> bool:
@@ -431,16 +442,25 @@ def check_downtime_window(text: str) -> bool:
 
 def is_new_inquiry_start(text: str) -> bool:
     """Check if the user's message is an initial inquiry or starting a new activity topic."""
+    import re
     lower = (text or "").lower().strip()
     if not lower:
+        return False
+    # If the user is confirming prerequisites, this is an answer/confirmation, NOT an initial inquiry start
+    if check_prereq_ack(text):
         return False
     patterns = [
         "help me out in", "help me out with", "help me with", "help with", "i need help",
         "i want to", "can you help me with", "can u help me", "how do i",
-        "activity i need", "activity to create", "i need to create ticket for",
-        "create a ticket for", "create ticket for", "open a ticket for", "open ticket for"
+        "activity i need", "activity to create", "i need to create ticket",
+        "i need create ticket", "need to create ticket", "need create ticket",
+        "want to create ticket", "create a ticket", "create ticket", "open a ticket",
+        "open ticket", "raise a ticket", "raise ticket", "log a ticket", "log ticket",
+        "start ticket", "new ticket"
     ]
     if any(p in lower for p in patterns):
+        return True
+    if re.search(r"\b(need|want|like)\s+(to\s+)?(create|open|raise|log|make)\s+(a\s+)?ticket\b", lower):
         return True
     act_mentions = [
         "file management activity", "files management activity", "files mangements activty",
