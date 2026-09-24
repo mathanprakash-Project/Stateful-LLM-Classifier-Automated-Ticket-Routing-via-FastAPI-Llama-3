@@ -17,16 +17,34 @@ async def call_ollama(
     format_json: bool = False,
     system_prompt: Optional[str] = None,
     preferred_model: Optional[str] = None,
+    task_tier: Optional[str] = None,
 ) -> Optional[str]:
     """
     Calls Ollama API with fallback across candidate models (e.g. configured model -> local llama3.2:3b).
+
+    Args:
+        task_tier: Model routing tier — "micro", "mid", or "strong".
+                   Maps to settings.MODEL_TIER_MICRO/MID/STRONG for cost-optimized routing.
+                   If None, uses DEFAULT_MODEL (backward compatible).
     """
     if settings.LLM_PROVIDER == "mock":
         return None
 
+    # Model Routing: select the right model based on pipeline stage
+    tier_model = None
+    if task_tier:
+        tier_map = {
+            "micro": settings.MODEL_TIER_MICRO,
+            "mid": settings.MODEL_TIER_MID,
+            "strong": settings.MODEL_TIER_STRONG,
+        }
+        tier_model = tier_map.get(task_tier.lower())
+
     # Candidate models to try in order
     candidate_models: List[str] = []
-    if preferred_model:
+    if tier_model:
+        candidate_models.append(tier_model)
+    if preferred_model and preferred_model not in candidate_models:
         candidate_models.append(preferred_model)
     if settings.DEFAULT_MODEL and settings.DEFAULT_MODEL not in candidate_models:
         candidate_models.append(settings.DEFAULT_MODEL)
@@ -45,6 +63,10 @@ async def call_ollama(
     if system_prompt:
         payload["system"] = system_prompt
 
+    import time
+    from app.core.model_tracker import model_tracker
+    start_time = time.time()
+
     async with httpx.AsyncClient(timeout=settings.LLM_TIMEOUT) as client:
         for model_name in candidate_models:
             payload["model"] = model_name
@@ -57,6 +79,17 @@ async def call_ollama(
                     data = resp.json()
                     response_text = data.get("response", "").strip()
                     if response_text:
+                        duration_ms = (time.time() - start_time) * 1000
+                        p_tokens = data.get("prompt_eval_count") or max(int(len(prompt.split()) * 1.3), 10)
+                        c_tokens = data.get("eval_count") or max(int(len(response_text.split()) * 1.3), 5)
+                        model_tracker.record_llm_call(
+                            model=model_name,
+                            tier=task_tier,
+                            prompt_tokens=p_tokens,
+                            completion_tokens=c_tokens,
+                            latency_ms=duration_ms,
+                            status="success",
+                        )
                         return response_text
                 elif resp.status_code in (401, 403, 404):
                     logger.info("Model '%s' returned HTTP %s on Ollama, trying next candidate...", model_name, resp.status_code)

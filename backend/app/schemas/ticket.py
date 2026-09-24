@@ -36,13 +36,25 @@ class TicketUpdate(BaseModel):
     category_id: Optional[str] = None
     subcategory_id: Optional[str] = None
     priority: Optional[str] = Field(None, pattern="^(low|medium|high|critical)$")
-    status: Optional[str] = Field(None, pattern="^(draft|open|assigned|in_progress|escalated|resolved|closed|reopened|cancelled|pending_manager_routing|pending_admin_approval|approved|rejected|routed)$")
+    status: Optional[str] = Field(None, pattern="^(draft|open|assigned|in_progress|escalated|resolved|closed|reopened|cancelled|pending_cancellation|pending_manager_routing|pending_admin_approval|approved|rejected|routed)$")
     assigned_to_id: Optional[str] = None
     comment: Optional[str] = None
     change_reason: Optional[str] = None
     version: Optional[int] = None
     operation_status: Optional[str] = None
     prerequisites_notes: Optional[str] = None
+
+
+class CancelTicketRequest(BaseModel):
+    reason: str = Field(..., min_length=3, max_length=2000)
+
+
+class CancelApprovalRequest(BaseModel):
+    notes: Optional[str] = None
+
+
+class CancelRejectionRequest(BaseModel):
+    reason: str = Field(..., min_length=3, max_length=2000)
 
 
 class ReopenRequest(BaseModel):
@@ -116,6 +128,7 @@ class TicketResponse(BaseModel):
     downtime_acknowledged: bool = False
     prerequisites_confirmed: bool = False
     prerequisites_notes: str | None = None
+    routing_details: Optional[dict[str, Any]] = None
 
 
 class TicketListSummary(BaseModel):
@@ -136,6 +149,7 @@ class TicketListSummary(BaseModel):
     requires_admin_approval: bool = False
     execution_mode: str | None = None
     downtime_required: bool = False
+    routing_details: Optional[dict[str, Any]] = None
 
 
 class TicketListResponse(BaseModel):

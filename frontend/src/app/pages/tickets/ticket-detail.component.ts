@@ -24,6 +24,11 @@ import { ToastService } from '../../services/toast.service';
           </div>
         </div>
         <div class="flex items-center gap-2">
+          <!-- Request Cancellation button for Requester User or Staff -->
+          <button *ngIf="canRequestCancellation()" class="btn btn-sm btn-outline-danger flex items-center gap-1" (click)="openCancelModal()" title="Request Ticket Cancellation">
+            <span class="material-symbols-outlined text-xs">cancel</span>
+            <span>Cancel Ticket</span>
+          </button>
           <!-- Close button for resolved ticket (Requester User, Manager, Admin only; Employees cannot close) -->
           <button *ngIf="selectedTicket.status === 'resolved' && !isAgentOnly()" class="btn btn-sm btn-primary" (click)="closeTicket()" title="Close Ticket">
             <span class="material-symbols-outlined">lock</span>
@@ -56,10 +61,10 @@ import { ToastService } from '../../services/toast.service';
         </div>
 
         <!-- WORKFLOW PROCESS STEPPER -->
-        <div class="workflow-stepper mb-5 p-3 rounded animate-fade" style="background: #000000; border: 1px solid var(--corona-border);">
+        <div class="workflow-stepper mb-5 p-3 rounded animate-fade" style="background: var(--corona-surface-elevated); border: 1px solid var(--corona-border);">
           <div class="flex justify-between items-center text-xs font-bold text-muted mb-2">
             <span>Workflow Process Lifecycle</span>
-            <span class="text-white font-semibold">Current: {{ getProcessStageLabel(selectedTicket.status) }}</span>
+            <span class="text-main font-semibold">Current: {{ getProcessStageLabel(selectedTicket.status) }}</span>
           </div>
           <div class="flex items-center gap-1 w-full">
             <div class="flex-1 py-1 px-2 rounded text-center text-xs font-semibold"
@@ -123,7 +128,7 @@ import { ToastService } from '../../services/toast.service';
             </span>
             <span class="op-downtime-pill" [class.downtime-warn]="selectedTicket.downtime_required" [class.downtime-lockout]="selectedTicket.execution_mode === 'Hybrid'">
               <span class="material-symbols-outlined">{{ selectedTicket.downtime_required ? 'power_off' : 'lock_clock' }}</span>
-              {{ selectedTicket.downtime_required ? 'Planned Downtime' : (selectedTicket.execution_mode === 'Hybrid' ? 'User Lockout' : 'No Downtime') }}
+              {{ selectedTicket.activity_code === 'CLIENT_DATA_TRANSFER' ? '7-Hour User Lockout' : (selectedTicket.activity_code === 'APPLICATION_VERSION' ? '1-Hour Planned Downtime' : (selectedTicket.downtime_required ? 'Planned Downtime' : (selectedTicket.execution_mode === 'Hybrid' ? 'User Lockout' : 'No Downtime'))) }}
             </span>
             <span *ngIf="selectedTicket.prerequisites_confirmed" class="prereq-badge success">
               <span class="material-symbols-outlined">task_alt</span>
@@ -156,6 +161,134 @@ import { ToastService } from '../../services/toast.service';
         <div class="card-subtle p-4 mb-6">
           <h4 class="text-xs uppercase font-bold text-muted mb-2">Description & Scope</h4>
           <p class="whitespace-pre-wrap leading-relaxed">{{ selectedTicket.description }}</p>
+        </div>
+
+        <!-- OPERATIONAL ROUTING INTELLIGENCE & GOVERNANCE INSPECTION PANEL -->
+        <div *ngIf="selectedTicket.routing_details" class="routing-intelligence-card mb-6 animate-fade">
+          <div class="routing-card-header flex items-center justify-between pb-3 mb-3 border-b" style="border-color: rgba(255, 255, 255, 0.08);">
+            <div class="flex items-center gap-3">
+              <div class="routing-icon-badge" [ngClass]="getRoutingBadgeClass(selectedTicket.routing_details.routed_to_role)">
+                <span class="material-symbols-outlined">{{ getRoutingIcon(selectedTicket.routing_details.routed_to_role) }}</span>
+              </div>
+              <div>
+                <div class="flex items-center gap-2">
+                  <h4 class="text-sm font-bold text-white uppercase tracking-wider" style="margin: 0;">
+                    Operational Routing & Governance Transparency
+                  </h4>
+                  <span class="badge-role-tag role-{{ selectedTicket.routing_details.routed_to_role }}">
+                    Routed to: {{ selectedTicket.routing_details.role_title }}
+                  </span>
+                </div>
+                <div class="text-xs text-muted mt-0.5">
+                  Governance Policy: <strong class="text-white">{{ selectedTicket.routing_details.routing_policy }}</strong> • 
+                  Classification: <span class="text-purple font-semibold">{{ selectedTicket.routing_details.governance_level }}</span>
+                </div>
+              </div>
+            </div>
+            <div *ngIf="selectedTicket.routing_details.requires_approval" class="approval-req-pill">
+              <span class="pulse-dot"></span>
+              <span>Action / Sign-off Required</span>
+            </div>
+          </div>
+
+          <!-- WHY THIS TICKET WAS ROUTED TO YOU / THIS ROLE -->
+          <div class="routing-reason-box p-3 mb-3 rounded" style="background: rgba(110, 86, 207, 0.1); border-left: 4px solid var(--corona-purple); border: 1px solid rgba(110, 86, 207, 0.25);">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="material-symbols-outlined text-purple" style="font-size: 18px;">help_outline</span>
+              <strong class="text-xs uppercase tracking-wider text-purple">Why Was This Ticket Routed Here?</strong>
+            </div>
+            <p class="text-sm text-white mb-0 leading-relaxed font-medium">
+              {{ selectedTicket.routing_details.routing_reason }}
+            </p>
+          </div>
+
+          <!-- MULTI-AGENT CONSENSUS & OPERATIONAL IMPACT METRICS -->
+          <div class="grid grid-cols-2 gap-3 text-xs" *ngIf="selectedTicket.routing_details.consensus_validation || selectedTicket.routing_details.downtime_required || selectedTicket.execution_mode">
+            <!-- Consensus Validation Details (Module 3) -->
+            <div *ngIf="selectedTicket.routing_details.consensus_validation as cv" class="p-2.5 rounded" style="background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.06);">
+              <div class="flex items-center gap-1.5 font-bold text-orange mb-1.5">
+                <span class="material-symbols-outlined" style="font-size: 16px;">groups</span>
+                <span>3-Agent Consensus Verification</span>
+              </div>
+              <div class="flex justify-between py-0.5 text-muted">
+                <span>Majority Vote Agreement:</span>
+                <strong class="text-white">{{ cv.agreement_ratio }} ({{ cv.unanimous ? 'Unanimous' : 'Majority' }})</strong>
+              </div>
+              <div class="flex justify-between py-0.5 text-muted">
+                <span>Confidence Score:</span>
+                <strong class="text-green">{{ (cv.average_confidence * 100) | number:'1.0-0' }}%</strong>
+              </div>
+              <div class="flex justify-between py-0.5 text-muted">
+                <span>Human Escalation:</span>
+                <span [class.text-red]="cv.escalate_to_human" [class.text-green]="!cv.escalate_to_human">{{ cv.escalate_to_human ? 'Required' : 'No (Passed)' }}</span>
+              </div>
+            </div>
+
+            <!-- Execution & Downtime Governance -->
+            <div class="p-2.5 rounded" style="background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.06);">
+              <div class="flex items-center gap-1.5 font-bold text-cyan mb-1.5">
+                <span class="material-symbols-outlined" style="font-size: 16px;">verified</span>
+                <span>Operational Governance Compliance</span>
+              </div>
+              <div class="flex justify-between py-0.5 text-muted">
+                <span>Execution Mode:</span>
+                <strong class="text-white">{{ selectedTicket.routing_details.execution_mode }}</strong>
+              </div>
+              <div class="flex justify-between py-0.5 text-muted">
+                <span>Downtime Impact:</span>
+                <span class="text-white font-medium">{{ selectedTicket.activity_code === 'CLIENT_DATA_TRANSFER' ? '7-Hour User Lockout (No Full Server Downtime)' : (selectedTicket.activity_code === 'APPLICATION_VERSION' ? '1-Hour Planned Downtime' : (selectedTicket.routing_details.downtime_required ? 'Planned Downtime' : (selectedTicket.routing_details.execution_mode === 'Hybrid' ? 'User Lockout (No Full Downtime)' : 'Online (Zero Downtime)'))) }}</span>
+              </div>
+              <div class="flex justify-between py-0.5 text-muted">
+                <span>Prerequisites Status:</span>
+                <span [class.text-green]="selectedTicket.routing_details.prerequisites_confirmed" class="font-medium">
+                  {{ selectedTicket.routing_details.prerequisites_confirmed ? 'Verified & Complete' : 'Standard Queue' }}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- CANCELLATION REQUEST PENDING APPROVAL PANEL -->
+        <div *ngIf="selectedTicket.status === 'pending_cancellation'" class="mb-6 p-4 animate-fade" style="background: rgba(255, 61, 0, 0.12); border: 1px solid var(--corona-red); border-radius: var(--radius-sm);">
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2">
+              <span class="material-symbols-outlined text-red" style="font-size: 26px; color: var(--corona-red);">cancel_presentation</span>
+              <div>
+                <h4 style="color: var(--corona-red); font-size: 1rem; margin: 0; font-weight: 700;">Ticket Cancellation Request Pending Approval</h4>
+                <p class="text-xs text-white mt-0.5 mb-0">The requester has requested this maintenance ticket to be cancelled. Review the reason below to approve or reject.</p>
+              </div>
+            </div>
+            <span class="badge-role-tag role-manager" style="background: rgba(255, 61, 0, 0.2); color: var(--corona-red); border-color: rgba(255, 61, 0, 0.4);">
+              Action Required: Manager / Admin
+            </span>
+          </div>
+
+          <!-- Stated Cancellation Reason -->
+          <div *ngIf="getCancelRequestDetails() as cr" class="p-3 mb-3 rounded text-sm" style="background: var(--corona-surface-elevated); border: 1px solid var(--corona-border); border-left: 4px solid var(--corona-red); color: var(--text-main);">
+            <div class="flex items-center justify-between mb-1">
+              <strong style="color: var(--corona-red);">Customer's Stated Reason for Cancellation:</strong>
+              <span class="text-xs text-muted">Requested by {{ cr.requested_by }} on {{ cr.requested_at | date:'medium' }}</span>
+            </div>
+            <div class="mt-1 italic font-medium">"{{ cr.reason }}"</div>
+          </div>
+
+          <!-- Approval / Rejection Controls for Manager / Admin -->
+          <div *ngIf="isManagerOrAdmin()" class="flex items-center gap-3 pt-2 border-t" style="border-color: rgba(255, 61, 0, 0.25);">
+            <button class="btn btn-danger flex items-center gap-1" (click)="approveCancellation()">
+              <span class="material-symbols-outlined text-sm">check_circle</span>
+              <span>Approve Cancellation</span>
+            </button>
+            <button class="btn btn-outlined flex items-center gap-1" (click)="openRejectCancelModal()">
+              <span class="material-symbols-outlined text-sm">close</span>
+              <span>Reject Cancellation (Keep Active)</span>
+            </button>
+          </div>
+
+          <!-- User View for Pending Cancellation -->
+          <div *ngIf="!isManagerOrAdmin()" class="text-xs text-muted flex items-center gap-1.5 pt-2 border-t" style="border-color: rgba(255, 61, 0, 0.25);">
+            <span class="material-symbols-outlined text-sm text-yellow">schedule</span>
+            <span>Your cancellation request has been submitted to the Support Management queue. A manager or administrator will review and confirm shortly.</span>
+          </div>
         </div>
 
         <!-- ROLE ACTION PANELS -->
@@ -402,7 +535,7 @@ import { ToastService } from '../../services/toast.service';
           <div class="modal-header flex justify-between items-center pb-3 border-b" style="border-color: var(--corona-border);">
             <div class="flex items-center gap-2">
               <span class="material-symbols-outlined" style="font-size: 26px; color: var(--corona-orange);">warning</span>
-              <h3 class="modal-title" style="font-size: 1.1rem; color: #ffffff; margin: 0;">Cross-Check Before Reopen</h3>
+              <h3 class="modal-title" style="font-size: 1.1rem; color: var(--text-main); margin: 0;">Cross-Check Before Reopen</h3>
             </div>
             <button class="icon-btn" (click)="showReopenModal = false">
               <span class="material-symbols-outlined">close</span>
@@ -415,7 +548,7 @@ import { ToastService } from '../../services/toast.service';
                 <span class="material-symbols-outlined" style="font-size: 20px;">info</span>
                 ⚠️ Please cross-check everything before reopening!
               </p>
-              <p style="font-size: 0.84rem; color: #ffffff; margin: 0; line-height: 1.5;">
+              <p style="font-size: 0.84rem; color: var(--text-main); margin: 0; line-height: 1.5;">
                 Please cross-check all logs, application state, and execution results. Users can reopen a ticket for a <strong>maximum of 3 times</strong>.
                 <br />
                 This action will be <strong>reopen attempt {{ getReopenCount() + 1 }} of 3</strong> and will be prioritized with <strong>elevated HIGH priority</strong>.
@@ -423,7 +556,7 @@ import { ToastService } from '../../services/toast.service';
             </div>
 
             <div class="mb-3">
-              <label class="form-label font-bold text-white mb-1 block" style="font-size: 0.88rem;">
+              <label class="form-label font-bold text-main mb-1 block" style="font-size: 0.88rem;">
                 Detailed Reason for Reopening <span class="text-danger">*</span>
               </label>
               <textarea
@@ -452,6 +585,100 @@ import { ToastService } from '../../services/toast.service';
         </div>
       </div>
 
+      <!-- CANCELLATION REQUEST MODAL (FOR USER / REQUESTER) -->
+      <div *ngIf="showCancelModal" class="modal-backdrop animate-fade" (click)="showCancelModal = false">
+        <div class="modal-dialog card-surface animate-pop" (click)="$event.stopPropagation()" style="max-width: 520px; border: 1px solid var(--corona-red);">
+          <div class="modal-header flex justify-between items-center pb-3 border-b" style="border-color: var(--corona-border);">
+            <div class="flex items-center gap-2">
+              <span class="material-symbols-outlined" style="font-size: 26px; color: var(--corona-red);">cancel</span>
+              <h3 class="modal-title" style="font-size: 1.1rem; color: var(--text-main); margin: 0;">Request Ticket Cancellation</h3>
+            </div>
+            <button class="icon-btn" (click)="showCancelModal = false">
+              <span class="material-symbols-outlined">close</span>
+            </button>
+          </div>
+
+          <div class="modal-body" style="padding: 18px 0;">
+            <p style="font-size: 0.88rem; color: var(--text-main); margin: 0 0 14px 0; line-height: 1.5;">
+              Are you sure you want to request cancellation for ticket <strong>#{{ selectedTicket.ticket_number }}</strong>?
+              Your request will be routed to a Support Manager or Administrator for sign-off and approval.
+            </p>
+
+            <div class="mb-3">
+              <label class="form-label font-bold text-main mb-2 block" style="font-size: 0.82rem;">
+                Select Quick Reason or Type Below:
+              </label>
+              <div class="flex flex-wrap gap-1.5 mb-2">
+                <button type="button" class="chip-btn" [class.active]="cancelReason === 'Issue resolved on its own / self-healed'" (click)="selectPresetCancelReason('Issue resolved on its own / self-healed')">Self-Healed</button>
+                <button type="button" class="chip-btn" [class.active]="cancelReason === 'No longer required / obsolete request'" (click)="selectPresetCancelReason('No longer required / obsolete request')">No Longer Needed</button>
+                <button type="button" class="chip-btn" [class.active]="cancelReason === 'Created by mistake / wrong environment'" (click)="selectPresetCancelReason('Created by mistake / wrong environment')">Created by Mistake</button>
+                <button type="button" class="chip-btn" [class.active]="cancelReason === 'Duplicate request created earlier'" (click)="selectPresetCancelReason('Duplicate request created earlier')">Duplicate Request</button>
+              </div>
+              <textarea
+                class="form-textarea w-full"
+                rows="3"
+                style="width: 100%; border-radius: var(--radius-sm); font-size: 0.85rem;"
+                placeholder="State your reason for requesting ticket cancellation in detail..."
+                [(ngModel)]="cancelReason"
+              ></textarea>
+              <div *ngIf="cancelReasonError" class="text-danger text-xs mt-1 font-semibold flex items-center gap-1">
+                <span class="material-symbols-outlined" style="font-size: 14px;">error</span> {{ cancelReasonError }}
+              </div>
+            </div>
+          </div>
+
+          <div class="modal-footer flex justify-end gap-2 pt-3 border-t" style="border-color: var(--corona-border);">
+            <button class="btn btn-outlined" (click)="showCancelModal = false">Nevermind</button>
+            <button class="btn btn-danger" (click)="submitCancellationRequest()">
+              <span class="material-symbols-outlined">send</span> Submit Cancellation Request
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- REJECT CANCELLATION MODAL (FOR MANAGER / ADMIN) -->
+      <div *ngIf="showRejectCancelModal" class="modal-backdrop animate-fade" (click)="showRejectCancelModal = false">
+        <div class="modal-dialog card-surface animate-pop" (click)="$event.stopPropagation()" style="max-width: 500px; border: 1px solid var(--corona-orange);">
+          <div class="modal-header flex justify-between items-center pb-3 border-b" style="border-color: var(--corona-border);">
+            <div class="flex items-center gap-2">
+              <span class="material-symbols-outlined" style="font-size: 24px; color: var(--corona-orange);">block</span>
+              <h3 class="modal-title" style="font-size: 1.05rem; color: var(--text-main); margin: 0;">Reject Cancellation Request</h3>
+            </div>
+            <button class="icon-btn" (click)="showRejectCancelModal = false">
+              <span class="material-symbols-outlined">close</span>
+            </button>
+          </div>
+
+          <div class="modal-body" style="padding: 16px 0;">
+            <p style="font-size: 0.85rem; color: var(--text-main); margin: 0 0 12px 0; line-height: 1.5;">
+              Rejecting this cancellation will restore ticket <strong>#{{ selectedTicket.ticket_number }}</strong> to its previous active queue state.
+            </p>
+            <div class="mb-2">
+              <label class="form-label font-bold text-main mb-1 block" style="font-size: 0.82rem;">
+                Reason for Rejection <span class="text-danger">*</span>
+              </label>
+              <textarea
+                class="form-textarea w-full"
+                rows="3"
+                style="width: 100%; border-radius: var(--radius-sm); font-size: 0.85rem;"
+                placeholder="Explain why cancellation was rejected (e.g., operational maintenance already underway, dependency verification needed)..."
+                [(ngModel)]="rejectCancelReason"
+              ></textarea>
+              <div *ngIf="rejectCancelReasonError" class="text-danger text-xs mt-1 font-semibold flex items-center gap-1">
+                <span class="material-symbols-outlined" style="font-size: 14px;">error</span> {{ rejectCancelReasonError }}
+              </div>
+            </div>
+          </div>
+
+          <div class="modal-footer flex justify-end gap-2 pt-3 border-t" style="border-color: var(--corona-border);">
+            <button class="btn btn-outlined" (click)="showRejectCancelModal = false">Cancel</button>
+            <button class="btn btn-primary" (click)="submitRejectCancellation()">
+              <span class="material-symbols-outlined">restart_alt</span> Confirm Rejection & Keep Active
+            </button>
+          </div>
+        </div>
+      </div>
+
     </div>
   `,
   styles: [`
@@ -465,7 +692,7 @@ import { ToastService } from '../../services/toast.service';
     .ticket-lg-num { font-size: 1.4rem; font-weight: 800; color: var(--corona-purple); font-family: var(--font-heading); }
     
     .card-surface { background: var(--corona-surface); border: 1px solid var(--corona-border); border-radius: var(--radius-sm); padding: 24px; }
-    .card-subtle { background: #000000; border: 1px solid var(--corona-border); border-radius: var(--radius-sm); }
+    .card-subtle { background: var(--corona-surface-elevated); border: 1px solid var(--corona-border); border-radius: var(--radius-sm); }
     .p-4 { padding: 16px; }
     
     .status-badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.68rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; }
@@ -490,9 +717,9 @@ import { ToastService } from '../../services/toast.service';
     .restriction-badge.warn { background: rgba(255, 171, 0, 0.15); border: 1px solid rgba(255, 171, 0, 0.3); color: var(--corona-orange); }
     .restriction-badge.info { background: rgba(0, 144, 231, 0.15); border: 1px solid rgba(0, 144, 231, 0.3); color: var(--corona-blue); }
     .restriction-badge .material-symbols-outlined { font-size: 16px; }
-    .operation-status-badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.68rem; font-weight: 700; text-transform: uppercase; background: #000; border: 1px solid var(--corona-border); color: var(--text-muted); }
+    .operation-status-badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.68rem; font-weight: 700; text-transform: uppercase; background: var(--corona-surface-elevated); border: 1px solid var(--corona-border); color: var(--text-muted); }
 
-    .operational-banner { background: #000000; border: 1px solid var(--corona-border); border-radius: var(--radius-sm); }
+    .operational-banner { background: var(--corona-surface-elevated); border: 1px solid var(--corona-border); border-radius: var(--radius-sm); }
     .op-mode-pill { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; background: rgba(143, 95, 232, 0.15); color: var(--corona-purple); border: 1px solid rgba(143, 95, 232, 0.3); }
     .op-mode-pill .material-symbols-outlined { font-size: 14px; }
     .op-downtime-pill { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 700; background: rgba(0, 210, 91, 0.15); color: var(--corona-green); border: 1px solid rgba(0, 210, 91, 0.3); }
@@ -502,8 +729,8 @@ import { ToastService } from '../../services/toast.service';
     .prereq-badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 700; background: rgba(0, 210, 91, 0.15); color: var(--corona-green); border: 1px solid rgba(0, 210, 91, 0.3); }
     .prereq-badge .material-symbols-outlined { font-size: 14px; }
 
-    .admin-action-panel { background: #000000; border: 1px solid var(--corona-border); border-radius: var(--radius-sm); padding: 18px; }
-    .admin-action-panel h4 { display: flex; align-items: center; gap: 8px; color: #ffffff; }
+    .admin-action-panel { background: var(--corona-surface-elevated); border: 1px solid var(--corona-border); border-radius: var(--radius-sm); padding: 18px; }
+    .admin-action-panel h4 { display: flex; align-items: center; gap: 8px; color: var(--text-main); }
     .admin-action-panel h4 .material-symbols-outlined { font-size: 20px; }
 
     .btn-success { background: var(--corona-green); color: #000; font-weight: 700; border: none; }
@@ -519,21 +746,21 @@ import { ToastService } from '../../services/toast.service';
     .priority-critical { color: #ff0055; text-shadow: 0 0 8px rgba(255, 0, 85, 0.4); }
     
     .form-label { display: block; font-size: 0.72rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px; }
-    .form-select, .form-input, .form-textarea { padding: 8px 12px; border-radius: var(--radius-sm); background: #000000; border: 1px solid var(--corona-border); color: #ffffff; font-family: inherit; font-size: 0.85rem; outline: none; }
+    .form-select, .form-input, .form-textarea { padding: 8px 12px; border-radius: var(--radius-sm); background: var(--corona-surface-elevated); border: 1px solid var(--corona-border); color: var(--text-main); font-family: inherit; font-size: 0.85rem; outline: none; }
     .btn { padding: 8px 16px; border-radius: var(--radius-sm); font-family: inherit; font-weight: 600; font-size: 0.85rem; border: 1px solid transparent; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: var(--transition); }
     .btn-primary { background: var(--corona-green); color: #000; font-weight: 700; }
     .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
-    .btn-outlined { background: transparent; border-color: var(--corona-border); color: #ffffff; }
+    .btn-outlined { background: transparent; border-color: var(--corona-border); color: var(--text-main); }
     .btn-outlined:hover { background: rgba(255, 255, 255, 0.05); border-color: var(--corona-purple); }
     .btn-danger { background: var(--corona-red); color: #fff; }
     .btn-danger:hover { background: #e6323a; }
     .btn-disabled-hint { opacity: 0.4; cursor: not-allowed; }
     .btn-sm { padding: 5px 10px; font-size: 0.75rem; }
     
-    .timeline-section { background: #000000; border: 1px solid var(--corona-border); border-radius: var(--radius-sm); padding: 20px; }
+    .timeline-section { background: var(--corona-surface-elevated); border: 1px solid var(--corona-border); border-radius: var(--radius-sm); padding: 20px; }
     .timeline-stream { border-left: 2px solid rgba(143, 95, 232, 0.3); margin-left: 18px; padding-left: 24px; display: flex; flex-direction: column; gap: 16px; position: relative; }
     .timeline-node { position: relative; }
-    .node-marker { position: absolute; left: -37px; top: 8px; width: 24px; height: 24px; border-radius: 50%; background: #000000; border: 2px solid var(--corona-purple); display: grid; place-items: center; box-shadow: 0 0 10px rgba(143, 95, 232, 0.3); z-index: 2; }
+    .node-marker { position: absolute; left: -37px; top: 8px; width: 24px; height: 24px; border-radius: 50%; background: var(--corona-surface-elevated); border: 2px solid var(--corona-purple); display: grid; place-items: center; box-shadow: 0 0 10px rgba(143, 95, 232, 0.3); z-index: 2; }
     .node-marker.icon-warn { border-color: var(--corona-orange); color: var(--corona-orange); box-shadow: 0 0 10px rgba(255, 171, 0, 0.3); }
     .node-marker.icon-success { border-color: var(--corona-green); color: var(--corona-green); box-shadow: 0 0 10px rgba(0, 210, 91, 0.3); }
     .node-marker.icon-blue { border-color: var(--corona-blue); color: var(--corona-blue); box-shadow: 0 0 10px rgba(0, 144, 231, 0.3); }
@@ -544,7 +771,7 @@ import { ToastService } from '../../services/toast.service';
 
     .timeline-card { background: var(--corona-surface); border: 1px solid var(--corona-border); border-radius: var(--radius-sm); padding: 12px 16px; }
     .timeline-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; flex-wrap: wrap; gap: 6px; }
-    .timeline-field-title { font-size: 0.88rem; font-weight: 700; color: #ffffff; }
+    .timeline-field-title { font-size: 0.88rem; font-weight: 700; color: var(--text-main); }
     .timeline-meta { display: flex; align-items: center; gap: 8px; font-size: 0.72rem; color: var(--text-dim); }
     .timeline-author-badge { background: rgba(255, 255, 255, 0.06); padding: 2px 6px; border-radius: 4px; color: #cbd5e1; font-weight: 600; }
 
@@ -564,10 +791,10 @@ import { ToastService } from '../../services/toast.service';
     .empty-timeline-state { display: flex; align-items: center; gap: 8px; padding: 12px 0; }
     
     .comments-list { display: flex; flex-direction: column; gap: 12px; }
-    .comment-bubble { background: #000000; padding: 12px 16px; border-radius: var(--radius-sm); font-size: 0.88rem; border: 1px solid var(--corona-border); color: #ffffff; }
+    .comment-bubble { background: var(--corona-surface-elevated); padding: 12px 16px; border-radius: var(--radius-sm); font-size: 0.88rem; border: 1px solid var(--corona-border); color: var(--text-main); }
     .comment-header { display: flex; justify-content: space-between; margin-bottom: 6px; }
     
-    .text-main { color: #ffffff; }
+    .text-main { color: var(--text-main); }
     .text-muted { color: var(--text-muted); }
     .text-accent { color: var(--corona-blue); }
     .text-sm { font-size: 0.8rem; }
@@ -595,6 +822,51 @@ import { ToastService } from '../../services/toast.service';
     
     .animate-fade { animation: fadeIn 0.2s ease-out; }
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+    /* Modal Backdrop & Dialog */
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(8px); z-index: 1000; display: grid; place-items: center; padding: 20px; }
+    .modal-dialog { width: min(600px, 100%); max-height: 90vh; background: var(--corona-surface); border: 1px solid var(--corona-border); border-radius: var(--radius-sm); display: flex; flex-direction: column; padding: 24px; overflow-y: auto; box-shadow: var(--shadow-card); }
+    .modal-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 14px; border-bottom: 1px solid var(--corona-border); padding-bottom: 12px; }
+    .modal-title { font-family: var(--font-heading); font-size: 1.1rem; font-weight: 700; color: var(--text-main); }
+
+    /* Cancellation & Quick preset chip buttons */
+    .chip-btn { background: rgba(255, 255, 255, 0.05); border: 1px solid var(--corona-border); color: #cbd5e1; font-size: 0.75rem; font-weight: 600; padding: 4px 10px; border-radius: 9999px; cursor: pointer; transition: var(--transition); }
+    .chip-btn:hover { background: rgba(255, 255, 255, 0.1); color: var(--text-main); border-color: var(--corona-purple); }
+    .chip-btn.active { background: rgba(252, 66, 74, 0.2); border-color: var(--corona-red); color: #ffffff; font-weight: 700; }
+    .btn-outline-danger { background: transparent; border: 1px solid rgba(252, 66, 74, 0.4); color: var(--corona-red); }
+    .btn-outline-danger:hover { background: rgba(252, 66, 74, 0.15); border-color: var(--corona-red); }
+
+    /* Routing Intelligence Card */
+    .routing-intelligence-card { background: var(--corona-surface-elevated); border: 1px solid var(--corona-border); border-radius: var(--radius-sm); padding: 18px; position: relative; }
+    .routing-icon-badge { width: 36px; height: 36px; border-radius: 8px; display: grid; place-items: center; }
+    .badge-role-admin { background: rgba(252, 66, 74, 0.2); color: var(--corona-red); border: 1px solid rgba(252, 66, 74, 0.4); }
+    .badge-role-manager { background: rgba(255, 171, 0, 0.2); color: var(--corona-orange); border: 1px solid rgba(255, 171, 0, 0.4); }
+    .badge-role-agent { background: rgba(0, 144, 231, 0.2); color: var(--corona-blue); border: 1px solid rgba(0, 144, 231, 0.4); }
+    .badge-role-default { background: rgba(143, 95, 232, 0.2); color: var(--corona-purple); border: 1px solid rgba(143, 95, 232, 0.4); }
+
+    .badge-role-tag { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 4px; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
+    .role-admin { background: rgba(252, 66, 74, 0.15); color: var(--corona-red); border: 1px solid rgba(252, 66, 74, 0.3); }
+    .role-manager { background: rgba(255, 171, 0, 0.15); color: var(--corona-orange); border: 1px solid rgba(255, 171, 0, 0.3); }
+    .role-agent, .role-employee { background: rgba(0, 144, 231, 0.15); color: var(--corona-blue); border: 1px solid rgba(0, 144, 231, 0.3); }
+    .role-user { background: rgba(143, 95, 232, 0.15); color: var(--corona-purple); border: 1px solid rgba(143, 95, 232, 0.3); }
+
+    .approval-req-pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 9999px; background: rgba(252, 66, 74, 0.15); border: 1px solid var(--corona-red); color: var(--corona-red); font-size: 0.72rem; font-weight: 700; text-transform: uppercase; }
+    .pulse-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--corona-red); box-shadow: 0 0 8px var(--corona-red); animation: pulseDot 1.5s infinite; }
+    @keyframes pulseDot { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.8); } }
+
+    .status-pending_cancellation { background: rgba(252, 66, 74, 0.15); color: var(--corona-red); border: 1px solid rgba(252, 66, 74, 0.3); }
+
+    .text-purple { color: var(--corona-purple); }
+    .text-orange { color: var(--corona-orange); }
+    .text-cyan { color: #38bdf8; }
+    .text-green { color: var(--corona-green); }
+    .text-red { color: var(--corona-red); }
+    .text-yellow { color: var(--corona-orange); }
+    .text-danger { color: var(--corona-red); }
+
+    .grid { display: grid; }
+    .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .tracking-wider { letter-spacing: 0.05em; }
   `]
 })
 export class TicketDetailComponent implements OnInit {
@@ -614,6 +886,13 @@ export class TicketDetailComponent implements OnInit {
   showReopenModal = false;
   reopenReason = '';
   reopenReasonError = '';
+
+  showCancelModal = false;
+  cancelReason = '';
+  cancelReasonError = '';
+  showRejectCancelModal = false;
+  rejectCancelReason = '';
+  rejectCancelReasonError = '';
 
   availableAgents: any[] = [];
 
@@ -908,6 +1187,142 @@ export class TicketDetailComponent implements OnInit {
     } catch (e: any) { alert(e.message); }
   }
 
+  canRequestCancellation(): boolean {
+    if (!this.selectedTicket) return false;
+    const s = this.selectedTicket.status;
+    if (s === 'closed' || s === 'cancelled' || s === 'pending_cancellation') return false;
+    return true;
+  }
+
+  openCancelModal() {
+    this.cancelReason = '';
+    this.cancelReasonError = '';
+    this.showCancelModal = true;
+  }
+
+  selectPresetCancelReason(reason: string) {
+    this.cancelReason = reason;
+    this.cancelReasonError = '';
+  }
+
+  async submitCancellationRequest() {
+    if (!this.selectedTicket) return;
+    if (!this.cancelReason || this.cancelReason.trim().length < 5) {
+      this.cancelReasonError = 'Please provide a reason (at least 5 characters) for requesting cancellation.';
+      return;
+    }
+    this.cancelReasonError = '';
+    const reason = this.cancelReason.trim();
+    this.showCancelModal = false;
+
+    try {
+      const res = await this.api.requestTicketCancellation(this.selectedTicket.id, reason);
+      if (!res.ok) {
+        const err = await res.json();
+        alert(err.error?.message || err.detail?.message || 'Failed to submit cancellation request');
+        return;
+      }
+      this.toast.show(
+        'Cancellation Requested',
+        `Ticket #${this.selectedTicket.ticket_number} cancellation request submitted for Manager/Admin review.`,
+        'warning',
+        this.selectedTicket.ticket_number
+      );
+      this.loadTicketDetails(this.selectedTicket.id);
+    } catch (e: any) {
+      alert('Error submitting cancellation: ' + e.message);
+    }
+  }
+
+  async approveCancellation() {
+    if (!this.selectedTicket) return;
+    const confirmed = confirm(`Are you sure you want to approve cancellation for ticket #${this.selectedTicket.ticket_number}? This will mark the ticket as Cancelled.`);
+    if (!confirmed) return;
+
+    try {
+      const res = await this.api.approveTicketCancellation(this.selectedTicket.id);
+      if (!res.ok) {
+        const err = await res.json();
+        alert(err.error?.message || err.detail?.message || 'Failed to approve cancellation');
+        return;
+      }
+      this.toast.show(
+        'Cancellation Approved',
+        `Ticket #${this.selectedTicket.ticket_number} has been officially Cancelled.`,
+        'info',
+        this.selectedTicket.ticket_number
+      );
+      this.loadTicketDetails(this.selectedTicket.id);
+    } catch (e: any) {
+      alert('Error approving cancellation: ' + e.message);
+    }
+  }
+
+  openRejectCancelModal() {
+    this.rejectCancelReason = '';
+    this.rejectCancelReasonError = '';
+    this.showRejectCancelModal = true;
+  }
+
+  async submitRejectCancellation() {
+    if (!this.selectedTicket) return;
+    if (!this.rejectCancelReason || this.rejectCancelReason.trim().length < 5) {
+      this.rejectCancelReasonError = 'Please state a reason (at least 5 characters) for rejecting cancellation.';
+      return;
+    }
+    this.rejectCancelReasonError = '';
+    const reason = this.rejectCancelReason.trim();
+    this.showRejectCancelModal = false;
+
+    try {
+      const res = await this.api.rejectTicketCancellation(this.selectedTicket.id, reason);
+      if (!res.ok) {
+        const err = await res.json();
+        alert(err.error?.message || err.detail?.message || 'Failed to reject cancellation');
+        return;
+      }
+      this.toast.show(
+        'Cancellation Rejected',
+        `Ticket #${this.selectedTicket.ticket_number} returned to active queue. Reason logged in activity timeline.`,
+        'success',
+        this.selectedTicket.ticket_number
+      );
+      this.loadTicketDetails(this.selectedTicket.id);
+    } catch (e: any) {
+      alert('Error rejecting cancellation: ' + e.message);
+    }
+  }
+
+  getCancelRequestDetails(): { requested_by: string; reason: string; requested_at: string } | null {
+    if (!this.selectedTicket?.meta_info?.cancel_request) return null;
+    const cr = this.selectedTicket.meta_info.cancel_request;
+    return {
+      requested_by: cr.requested_by_email || 'Requester',
+      reason: cr.reason || 'No reason provided',
+      requested_at: cr.requested_at || ''
+    };
+  }
+
+  getRoutingIcon(role?: string): string {
+    switch ((role || '').toLowerCase()) {
+      case 'admin': return 'admin_panel_settings';
+      case 'manager': return 'manage_accounts';
+      case 'agent':
+      case 'employee': return 'engineering';
+      default: return 'alt_route';
+    }
+  }
+
+  getRoutingBadgeClass(role?: string): string {
+    switch ((role || '').toLowerCase()) {
+      case 'admin': return 'badge-role-admin';
+      case 'manager': return 'badge-role-manager';
+      case 'agent':
+      case 'employee': return 'badge-role-agent';
+      default: return 'badge-role-default';
+    }
+  }
+
   async renewTicket() {
     if (!this.selectedTicket) return;
     try {
@@ -986,6 +1401,8 @@ export class TicketDetailComponent implements OnInit {
       const statusMap: { [key: string]: string } = {
         'pending_admin_approval': 'Pending Admin Approval',
         'pending_manager_routing': 'Pending Manager Routing',
+        'pending_cancellation': 'Pending Cancellation Review',
+        'cancelled': 'Cancelled',
         'open': 'Open / Submitted',
         'approved': 'Approved for Work',
         'assigned': 'Assigned to Engineer',
@@ -1017,6 +1434,7 @@ export class TicketDetailComponent implements OnInit {
 
     if (f === 'status') {
       if (v.includes('admin') || v.includes('pending')) return { icon: 'shield', colorClass: 'icon-warn' };
+      if (v === 'cancelled') return { icon: 'cancel', colorClass: 'icon-danger' };
       if (v === 'approved') return { icon: 'task_alt', colorClass: 'icon-success' };
       if (v === 'assigned') return { icon: 'person_add', colorClass: 'icon-purple' };
       if (v === 'in_progress') return { icon: 'engineering', colorClass: 'icon-blue' };
@@ -1046,7 +1464,7 @@ export class TicketDetailComponent implements OnInit {
 
     if (v === 'resolved' || v === 'approved' || v === 'completed') return 'pill-success';
     if (v === 'in_progress' || v === 'assigned') return 'pill-blue';
-    if (v === 'reopened' || v === 'rejected') return 'pill-danger';
+    if (v === 'reopened' || v === 'rejected' || v === 'cancelled') return 'pill-danger';
     if (v.includes('pending') || v === 'critical' || v === 'high') return 'pill-warn';
     return 'pill-purple';
   }

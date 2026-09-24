@@ -34,14 +34,23 @@ class AgentState(TypedDict):
     extracted_fields: Dict[str, Any]
     missing_fields: List[str]
 
+    # Module 1: Hybrid Retrieval (RAG)
+    retrieval_context: Optional[List[Dict[str, Any]]]  # Top-K retrieved documents from hybrid search
+
     # Draft
     draft: Optional[Dict[str, Any]]
     draft_id: Optional[str]
     draft_status: Optional[str]  # pending_review | approved | rejected
+
+    # Module 3: Consensus Validation
+    consensus_result: Optional[Dict[str, Any]]  # Majority vote result for restricted operations
 
     # Control
     needs_human_approval: bool
     ticket_created: Optional[Dict[str, Any]]
     response_text: Optional[str]
     error: Optional[str]
+
+    # Module 6: Responsible AI
+    rai_flags: Optional[List[Dict[str, Any]]]  # Safety/PII/compliance flags from RAI guard
 

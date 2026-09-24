@@ -1,0 +1,202 @@
+[
+  {
+    "test_id": "AU-001",
+    "activity_type": "APPLICATION_UI",
+    "complexity": "simple",
+    "description": "User reports a broken submit button",
+    "user_messages": ["The submit button on the form page is not working"],
+    "expected": {
+      "intent": "APPLICATION_UI"
+    }
+  },
+  {
+    "test_id": "AU-002",
+    "activity_type": "APPLICATION_UI",
+    "complexity": "simple",
+    "description": "Button is wrong color",
+    "user_messages": ["The save button is red instead of blue"],
+    "expected": {
+      "intent": "APPLICATION_UI"
+    }
+  },
+  {
+    "test_id": "AU-003",
+    "activity_type": "APPLICATION_UI",
+    "complexity": "medium",
+    "description": "Dropdown menu not appearing",
+    "user_messages": ["When I hover over the profile icon, nothing happens"],
+    "expected": {
+      "intent": "APPLICATION_UI"
+    }
+  },
+  {
+    "test_id": "AU-004",
+    "activity_type": "APPLICATION_UI",
+    "complexity": "medium",
+    "description": "Form validation error layout broken",
+    "user_messages": ["The layout is broken when displaying validation error fields on the checkout screen"],
+    "expected": {
+      "intent": "APPLICATION_UI"
+    }
+  },
+  {
+    "test_id": "AU-005",
+    "activity_type": "APPLICATION_UI",
+    "complexity": "complex",
+    "description": "Frontend UI screen glitch",
+    "user_messages": ["I see a frontend screen glitch on the login page whenever submitting credentials"],
+    "expected": {
+      "intent": "APPLICATION_UI"
+    }
+  },
+  {
+    "test_id": "FM-001",
+    "activity_type": "FILE_MANAGEMENT",
+    "complexity": "simple",
+    "description": "Cannot delete file",
+    "user_messages": ["I can't delete my old report file"],
+    "expected": {
+      "intent": "FILE_MANAGEMENT"
+    }
+  },
+  {
+    "test_id": "FM-002",
+    "activity_type": "FILE_MANAGEMENT",
+    "complexity": "simple",
+    "description": "File permissions update request",
+    "user_messages": ["Need to update file permissions for the finance directory"],
+    "expected": {
+      "intent": "FILE_MANAGEMENT"
+    }
+  },
+  {
+    "test_id": "FM-003",
+    "activity_type": "FILE_MANAGEMENT",
+    "complexity": "medium",
+    "description": "Archive logs housekeeping",
+    "user_messages": ["Please run the housekeeping script to archive old interface logs"],
+    "expected": {
+      "intent": "FILE_MANAGEMENT"
+    }
+  },
+  {
+    "test_id": "FM-004",
+    "activity_type": "FILE_MANAGEMENT",
+    "complexity": "complex",
+    "description": "Cleanup scripts and file access",
+    "user_messages": ["We need storage cleanup and directory permissions updated for the batch export folder"],
+    "expected": {
+      "intent": "FILE_MANAGEMENT"
+    }
+  },
+  {
+    "test_id": "CD-001",
+    "activity_type": "CLIENT_DATA_TRANSFER",
+    "complexity": "medium",
+    "description": "Need to transfer data to new client",
+    "user_messages": ["I need to migrate data from the old client to the new DB. Prerequisites are done."],
+    "expected": {
+      "intent": "CLIENT_DATA_TRANSFER"
+    }
+  },
+  {
+    "test_id": "CD-002",
+    "activity_type": "CLIENT_DATA_TRANSFER",
+    "complexity": "simple",
+    "description": "Transfer data from client 100 to 200",
+    "user_messages": ["Need to transfer data from client 100 to client 200 for user acceptance testing"],
+    "expected": {
+      "intent": "CLIENT_DATA_TRANSFER"
+    }
+  },
+  {
+    "test_id": "CD-003",
+    "activity_type": "CLIENT_DATA_TRANSFER",
+    "complexity": "complex",
+    "description": "Data transfer with lockout acknowledged",
+    "user_messages": ["Client data transfer requested for environment staging. Prerequisites verified and user lockout is approved."],
+    "expected": {
+      "intent": "CLIENT_DATA_TRANSFER"
+    }
+  },
+  {
+    "test_id": "AV-001",
+    "activity_type": "APPLICATION_VERSION",
+    "complexity": "complex",
+    "description": "Upgrade application to v2 during weekend",
+    "user_messages": ["Upgrade the prod app to v2.3.1. We have a maintenance window this Saturday."],
+    "expected": {
+      "intent": "APPLICATION_VERSION"
+    }
+  },
+  {
+    "test_id": "AV-002",
+    "activity_type": "APPLICATION_VERSION",
+    "complexity": "simple",
+    "description": "Apply version patch",
+    "user_messages": ["We need to apply the critical application version patch release next week"],
+    "expected": {
+      "intent": "APPLICATION_VERSION"
+    }
+  },
+  {
+    "test_id": "AV-003",
+    "activity_type": "APPLICATION_VERSION",
+    "complexity": "medium",
+    "description": "Runtime binary upgrade",
+    "user_messages": ["Application version upgrade to update core runtime engines and binaries"],
+    "expected": {
+      "intent": "APPLICATION_VERSION"
+    }
+  },
+  {
+    "test_id": "GQ-001",
+    "activity_type": "general_query",
+    "complexity": "simple",
+    "description": "Greeting user inquiry",
+    "user_messages": ["Hello, what activities do you support?"],
+    "expected": {
+      "intent": "general_query"
+    }
+  },
+  {
+    "test_id": "GQ-002",
+    "activity_type": "general_query",
+    "complexity": "simple",
+    "description": "Activity list inquiry",
+    "user_messages": ["Can you explain the available activities?"],
+    "expected": {
+      "intent": "general_query"
+    }
+  },
+  {
+    "test_id": "NT-001",
+    "activity_type": "NON_TECHNICAL",
+    "complexity": "simple",
+    "description": "Out of scope food recommendation",
+    "user_messages": ["Can you recommend a good pizza place near Bangalore?"],
+    "expected": {
+      "intent": "NON_TECHNICAL"
+    }
+  },
+  {
+    "test_id": "NT-002",
+    "activity_type": "NON_TECHNICAL",
+    "complexity": "simple",
+    "description": "Out of scope weather inquiry",
+    "user_messages": ["What is the weather forecast for tomorrow?"],
+    "expected": {
+      "intent": "NON_TECHNICAL"
+    }
+  },
+  {
+    "test_id": "NT-003",
+    "activity_type": "NON_TECHNICAL",
+    "complexity": "medium",
+    "description": "HR salary query out of scope",
+    "user_messages": ["When will my salary appraisal be credited?"],
+    "expected": {
+      "intent": "NON_TECHNICAL"
+    }
+  }
+]

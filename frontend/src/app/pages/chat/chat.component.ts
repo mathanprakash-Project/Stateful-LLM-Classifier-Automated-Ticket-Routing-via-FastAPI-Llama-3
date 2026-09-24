@@ -27,15 +27,15 @@ interface ChatMessage {
             <div class="agent-avatar">
               <span class="material-symbols-outlined">psychology</span>
             </div>
-            <div>
-              <div class="flex items-center gap-3 flex-wrap">
+            <div class="agent-meta">
+              <div class="agent-title-row">
                 <h3 class="agent-name">IT Triage AI Agent</h3>
                 <!-- Model Switcher Dropdown -->
                 <div class="model-selector-pill">
-                  <span class="material-symbols-outlined text-sm" [ngClass]="selectedModel === 'llama3.2:3b' ? 'text-green' : 'text-accent'">{{ selectedModel === 'llama3.2:3b' ? 'bolt' : 'cloud' }}</span>
+                  <span class="material-symbols-outlined model-icon" [ngClass]="selectedModel === 'llama3.2:3b' ? 'text-green' : 'text-accent'">{{ selectedModel === 'llama3.2:3b' ? 'bolt' : 'cloud' }}</span>
                   <select [(ngModel)]="selectedModel" (change)="onModelChange()" class="model-dropdown-select" title="Switch Active AI Model">
-                    <option value="llama3.2:3b">⚡ llama3.2:3b (Local Edge)</option>
-                    <option value="gpt-oss:120b-cloud">☁️ gpt-oss:120b-cloud (Cloud Enterprise)</option>
+                    <option value="llama3.2:3b">llama3.2:3b (Local Edge)</option>
+                    <option value="gpt-oss:120b-cloud">gpt-oss:120b-cloud (Cloud Enterprise)</option>
                   </select>
                 </div>
               </div>
@@ -135,9 +135,14 @@ interface ChatMessage {
                   <!-- Maintenance Window / Downtime Input Field -->
                   <div class="mt-2 pt-2 border-top" *ngIf="m.draft.draft_data.downtime_required || m.draft.draft_data.execution_mode === 'Hybrid'">
                     <label class="text-xs text-dim block mb-1 font-semibold">
-                      <span class="material-symbols-outlined text-xs align-middle">schedule</span> Scheduled Maintenance Window / Downtime (Optional/Required):
+                      <span class="material-symbols-outlined text-xs align-middle">schedule</span> Approved Downtime (DT) / Maintenance Window (From & To) — {{ m.draft.draft_data.activity_code === 'CLIENT_DATA_TRANSFER' ? '7 Hours DT Window' : '1 Hour DT Window' }}:
                     </label>
-                    <input type="text" class="chat-downtime-input" placeholder="e.g. Sunday 02:00 AM - 04:00 AM UTC" [(ngModel)]="m.draft.draft_data.maintenance_window">
+                    <input 
+                      type="text" 
+                      class="chat-downtime-input" 
+                      [placeholder]="m.draft.draft_data.activity_code === 'CLIENT_DATA_TRANSFER' ? 'e.g. From 25/09/2026 22:00 to 26/09/2026 05:00 UTC (7 Hours DT)' : 'e.g. From 25/09/2026 22:00 to 25/09/2026 23:00 UTC (1 Hour DT)'" 
+                      [(ngModel)]="m.draft.draft_data.maintenance_window"
+                    >
                   </div>
 
                   <!-- Mandatory confirmation checkbox with visual validation error -->
@@ -209,12 +214,37 @@ interface ChatMessage {
     .flex-col { flex-direction: column; }
     
     .chat-container { display: flex; flex-direction: column; height: calc(100vh - 120px); padding: 0; overflow: hidden; background: var(--corona-surface); border: 1px solid var(--corona-border); border-radius: var(--radius-sm); box-shadow: var(--shadow-card); }
-    .chat-header { padding: 16px 24px; border-bottom: 1px solid var(--corona-border); display: flex; align-items: center; justify-content: space-between; background: #000000; }
-    .chat-agent-info { display: flex; align-items: center; gap: 12px; }
-    .agent-avatar { width: 42px; height: 42px; border-radius: 50%; background: linear-gradient(135deg, var(--corona-purple), var(--corona-blue)); color: #fff; display: grid; place-items: center; }
-    .agent-name { font-size: 0.95rem; font-weight: 700; color: #ffffff; }
+    .chat-agent-info { display: flex; align-items: center; gap: 14px; }
+    .agent-avatar {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--corona-purple), var(--corona-blue));
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      box-shadow: 0 2px 8px rgba(143, 95, 232, 0.25);
+    }
+    .agent-avatar .material-symbols-outlined { font-size: 24px; }
+    .agent-meta { display: flex; flex-direction: column; gap: 4px; justify-content: center; }
+    .agent-title-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .agent-name {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--text-main);
+      margin: 0;
+      padding: 0;
+      line-height: 1.2;
+    }
     .model-badge { font-size: 0.65rem; background: rgba(0, 144, 231, 0.15); padding: 2px 6px; border-radius: 4px; color: var(--corona-blue); border: 1px solid rgba(0, 144, 231, 0.3); }
-    .agent-sub { font-size: 0.72rem; color: var(--text-muted); }
+    .agent-sub {
+      font-size: 0.74rem;
+      color: var(--text-muted);
+      line-height: 1.2;
+      margin: 0;
+    }
     
     .chat-stream { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 18px; }
     .chat-row { display: flex; gap: 12px; max-width: 84%; }
@@ -222,13 +252,13 @@ interface ChatMessage {
     
     .chat-avatar { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0; }
     .ai-av { background: linear-gradient(135deg, var(--corona-purple), var(--corona-blue)); color: #fff; }
-    .user-av { background: #000000; color: var(--corona-green); border: 1px solid var(--corona-border); }
+    .user-av { background: var(--corona-surface-elevated); color: var(--corona-green); border: 1px solid var(--corona-border); }
     
     .chat-bubble { padding: 14px 18px; border-radius: var(--radius-sm); font-size: 0.9rem; line-height: 1.6; }
-    .ai-bubble { background: #000000; border: 1px solid var(--corona-border); border-top-left-radius: 2px; color: #ffffff; }
-    .user-bubble { background: var(--corona-surface-elevated); color: #ffffff; border: 1px solid var(--corona-border); border-top-right-radius: 2px; }
+    .ai-bubble { background: var(--corona-surface-elevated); border: 1px solid var(--corona-border); border-top-left-radius: 2px; color: var(--text-main); }
+    .user-bubble { background: var(--corona-purple-bg); color: var(--text-main); border: 1px solid var(--corona-purple); border-top-right-radius: 2px; }
     
-    .draft-card { margin-top: 14px; padding: 18px; border-radius: var(--radius-sm); background: var(--corona-surface); border: 1px solid var(--corona-purple); box-shadow: var(--shadow-glow-purple); color: #ffffff; }
+    .draft-card { margin-top: 14px; padding: 18px; border-radius: var(--radius-sm); background: var(--corona-surface); border: 1px solid var(--corona-purple); box-shadow: var(--shadow-glow-purple); color: var(--text-main); }
     .draft-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
     .draft-card-title { font-weight: 700; font-size: 0.92rem; display: flex; align-items: center; gap: 6px; color: var(--corona-purple); }
     .badge-status-draft { font-size: 0.68rem; background: rgba(143, 95, 232, 0.15); color: var(--corona-purple); border: 1px solid rgba(143, 95, 232, 0.3); padding: 2px 8px; border-radius: 4px; font-weight: 700; }
@@ -239,12 +269,12 @@ interface ChatMessage {
     
     .draft-text-field, .draft-select-field, .draft-textarea-field {
       width: 100%;
-      background: #000000;
+      background: var(--corona-surface-elevated);
       border: 1px solid var(--corona-border);
       border-radius: var(--radius-sm);
       padding: 6px 10px;
       font-size: 0.84rem;
-      color: #ffffff;
+      color: var(--text-main);
       font-family: inherit;
       box-sizing: border-box;
       outline: none;
@@ -253,7 +283,7 @@ interface ChatMessage {
       border-color: var(--corona-purple);
     }
     
-    .draft-desc-box { background: #000000; padding: 10px 14px; border-radius: var(--radius-sm); font-size: 0.85rem; margin-bottom: 14px; border: 1px solid var(--corona-border); }
+    .draft-desc-box { background: var(--corona-surface-elevated); padding: 10px 14px; border-radius: var(--radius-sm); font-size: 0.85rem; margin-bottom: 14px; border: 1px solid var(--corona-border); color: var(--text-main); }
     .draft-actions { display: flex; gap: 10px; }
     .draft-confirmed { display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 0.85rem; color: var(--corona-green); }
     .draft-rejected { display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 0.85rem; color: var(--corona-red); }
@@ -266,13 +296,13 @@ interface ChatMessage {
     .draft-restriction-badge.info { background: rgba(0, 144, 231, 0.15); border: 1px solid rgba(0, 144, 231, 0.3); color: var(--corona-blue); }
     .draft-restriction-badge .material-symbols-outlined { font-size: 14px; }
     
-    .chat-input-bar { padding: 16px 24px; border-top: 1px solid var(--corona-border); background: #000000; display: flex; gap: 12px; }
-    .chat-text-input { flex: 1; padding: 10px 18px; border-radius: var(--radius-sm); background: var(--corona-surface); border: 1px solid var(--corona-border); color: #ffffff; font-family: inherit; font-size: 0.88rem; outline: none; }
+    .chat-input-bar { padding: 16px 24px; border-top: 1px solid var(--corona-border); background: var(--corona-surface); display: flex; gap: 12px; }
+    .chat-text-input { flex: 1; padding: 10px 18px; border-radius: var(--radius-sm); background: var(--corona-surface-elevated); border: 1px solid var(--corona-border); color: var(--text-main); font-family: inherit; font-size: 0.88rem; outline: none; }
     .chat-text-input:focus { border-color: var(--corona-purple); }
     
     .btn { padding: 8px 16px; border-radius: var(--radius-sm); font-family: inherit; font-weight: 600; font-size: 0.85rem; border: 1px solid transparent; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: var(--transition); }
     .btn-primary { background: var(--corona-green); color: #000; font-weight: 700; }
-    .btn-outlined { background: transparent; border-color: var(--corona-border); color: #ffffff; }
+    .btn-outlined { background: transparent; border-color: var(--corona-border); color: var(--text-main); }
     .btn-success { background: var(--corona-green); color: #000; font-weight: 700; }
     .btn-danger { background: var(--corona-red); color: #fff; }
     .btn-sm { padding: 5px 10px; font-size: 0.75rem; }
@@ -298,7 +328,7 @@ interface ChatMessage {
     
     .typing-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--corona-green); margin: 0 2px; animation: bounce 1.4s infinite ease-in-out both; }
     .typing-dot:nth-child(1) { animation-delay: -0.32s; }
-    .draft-op-box { background: #000000; border: 1px solid var(--corona-border); border-radius: var(--radius-sm); font-size: 0.82rem; }
+    .draft-op-box { background: var(--corona-surface-elevated); border: 1px solid var(--corona-border); border-radius: var(--radius-sm); font-size: 0.82rem; }
     .p-3 { padding: 12px; }
     .mb-2 { margin-bottom: 8px; }
     .mb-3 { margin-bottom: 12px; }
@@ -317,46 +347,65 @@ interface ChatMessage {
     .op-downtime-pill.downtime-lockout { background: rgba(255, 171, 0, 0.15); color: var(--corona-orange); border: 1px solid rgba(255, 171, 0, 0.3); }
     .op-downtime-pill .material-symbols-outlined { font-size: 14px; }
 
-    .prereq-mini-list { list-style: none; padding-left: 0; margin: 4px 0 0 0; display: flex; flex-direction: column; gap: 4px; color: #ffffff; }
-    .draft-risk-warning { display: flex; align-items: center; gap: 6px; background: rgba(255, 171, 0, 0.08); border: 1px solid rgba(255, 171, 0, 0.3); padding: 6px 10px; border-radius: var(--radius-sm); font-size: 0.75rem; color: #ffffff; margin-top: 6px; }
+    .prereq-mini-list { list-style: none; padding-left: 0; margin: 4px 0 0 0; display: flex; flex-direction: column; gap: 4px; color: var(--text-main); }
+    .draft-risk-warning { display: flex; align-items: center; gap: 6px; background: rgba(255, 171, 0, 0.08); border: 1px solid rgba(255, 171, 0, 0.3); padding: 6px 10px; border-radius: var(--radius-sm); font-size: 0.75rem; color: var(--text-main); margin-top: 6px; }
     .draft-risk-warning .material-symbols-outlined { font-size: 16px; flex-shrink: 0; color: var(--corona-orange); }
 
-    .checkbox-label { display: flex; align-items: flex-start; gap: 8px; font-size: 0.78rem; cursor: pointer; color: #ffffff; line-height: 1.3; }
+    .checkbox-label { display: flex; align-items: flex-start; gap: 8px; font-size: 0.78rem; cursor: pointer; color: var(--text-main); line-height: 1.3; }
     .checkbox-label input { margin-top: 2px; accent-color: var(--corona-green); }
 
     .checkbox-error-box { background: rgba(252, 66, 74, 0.08); border: 1px solid var(--corona-red); border-radius: 4px; padding: 8px; }
     .draft-validation-alert { display: flex; align-items: center; gap: 6px; color: var(--corona-red); font-size: 0.78rem; font-weight: 700; margin-top: 6px; }
 
-    .chat-downtime-input { width: 100%; background: #000000; border: 1px solid var(--corona-border); border-radius: var(--radius-sm); padding: 6px 10px; font-size: 0.8rem; color: #ffffff; margin-top: 4px; box-sizing: border-box; }
+    .chat-downtime-input { width: 100%; background: var(--corona-surface-elevated); border: 1px solid var(--corona-border); border-radius: var(--radius-sm); padding: 6px 10px; font-size: 0.8rem; color: var(--text-main); margin-top: 4px; box-sizing: border-box; }
     .chat-downtime-input:focus { border-color: var(--corona-purple); outline: none; }
 
     .model-selector-pill {
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      background: #000000;
+      background: var(--corona-surface-elevated);
       border: 1px solid var(--corona-border);
       border-radius: 20px;
-      padding: 3px 8px;
+      padding: 3px 10px 3px 8px;
       transition: var(--transition);
+      height: 28px;
+      box-sizing: border-box;
+      line-height: 1;
+      cursor: pointer;
     }
     .model-selector-pill:hover {
       border-color: var(--corona-purple);
+      box-shadow: 0 0 8px rgba(143, 95, 232, 0.2);
+    }
+    .model-icon {
+      font-size: 16px !important;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      line-height: 1;
     }
     .model-dropdown-select {
-      background: transparent;
-      border: none;
-      color: #ffffff;
-      font-size: 0.75rem;
-      font-weight: 700;
-      outline: none;
-      cursor: pointer;
-      font-family: inherit;
+      background: transparent !important;
+      border: none !important;
+      color: var(--text-main) !important;
+      font-size: 0.74rem !important;
+      font-weight: 700 !important;
+      outline: none !important;
+      box-shadow: none !important;
+      cursor: pointer !important;
+      font-family: inherit !important;
+      padding: 0 2px !important;
+      line-height: 1 !important;
+      height: auto !important;
+      border-radius: 0 !important;
     }
     .model-dropdown-select option {
-      background: #12151e;
-      color: #ffffff;
+      background: #12151e !important;
+      color: #ffffff !important;
       font-weight: 600;
+      padding: 8px 12px;
     }
 
     .typing-dot:nth-child(2) { animation-delay: -0.16s; }

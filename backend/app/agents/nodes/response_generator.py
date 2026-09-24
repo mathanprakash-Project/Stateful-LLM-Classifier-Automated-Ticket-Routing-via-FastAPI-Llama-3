@@ -109,11 +109,42 @@ def handle_conceptual_and_operational_inquiry(
         return None
     
     # 1. Execution Mode & Downtime inquiries
-    is_hybrid_query = any(k in q for k in ["what is hybrid", "explain hybrid", "about hybrid", "how does hybrid", "why hybrid", "hybrid mode explained"])
+    is_hybrid_confirmation = (
+        ("user lock" in q or "lockout" in q or "hybrid" in q)
+        and ("downtime" in q or "server" in q or "shut" in q or "stop" in q)
+        and ("?" in q or any(k in q for k in ["right", "correct", "true", "will happen", "only"]))
+    )
+
+    is_hybrid_query = any(k in q for k in [
+        "what is hybrid", "explain hybrid", "about hybrid", "how does hybrid", "why hybrid", "hybrid mode explained",
+        "user lock", "user lockout", "only user lock", "lockout required", "what is lockout", "why lockout",
+        "user lock will happen", "no downtime will happen", "no downtime"
+    ])
     is_offline_query = any(k in q for k in ["what is offline", "explain offline", "about offline", "how does offline", "why offline", "offline mode explained"])
     is_online_query = any(k in q for k in ["what is online", "explain online", "about online", "how does online", "why online", "online mode explained"])
     is_exec_mode_query = any(k in q for k in ["execution mode", "execution modes", "types of execution"])
-    is_downtime_query = any(k in q for k in ["is downtime required", "do we need downtime", "why downtime", "downtime policy", "downtime policies", "what is downtime", "explain downtime", "downtime are not"])
+    is_downtime_query = any(k in q for k in [
+        "is downtime required", "do we need downtime", "why downtime", "downtime policy", "downtime policies",
+        "what is downtime", "explain downtime", "downtime are not", "no downtime", "downtime will happen",
+        "downtime happen", "will downtime", "need downtime", "require downtime"
+    ])
+
+    if is_hybrid_confirmation:
+        return (
+            "### 🔄 **Correct! User Lockout Only — Zero Full Server Downtime**\n\n"
+            "**Yes, that is completely correct!**\n\n"
+            "In **Hybrid Execution Mode** (for **Client Data Transfer**):\n\n"
+            "1. 🖥️ **No Full Server Downtime:**\n"
+            "   - Physical application servers, operating systems, and database engines **remain completely powered on and running** throughout the transfer.\n\n"
+            "2. 🔒 **User Lockout Required:**\n"
+            "   - Only active user logins on the participating / target environments are **temporarily locked** during the transfer timeframe.\n"
+            "   - **Why?** This ensures that while master data and configuration records are being replicated across environments, nobody creates conflicting entries that could corrupt the bulk transfer.\n\n"
+            "3. ⚡ **Operational Advantage:**\n"
+            "   - Your system infrastructure stays alive, and only end-user login sessions are paused during the window.\n\n"
+            "---\n"
+            "💬 *Whenever you are ready, please specify your approved **Downtime / Maintenance Window (DT)** for Client Data Transfer (Duration: **7 Hours** User Lockout).\n"
+            "Please provide your schedule in **From and To** format (e.g., `From: 25/09/2026 22:00 to To: 26/09/2026 05:00 UTC` — 7 Hours Total), and our team will immediately generate your official ticket draft!*"
+        )
 
     if is_hybrid_query or (is_exec_mode_query and "hybrid" in q) or (is_downtime_query and ("hybrid" in q or "client" in q or "transfer" in q)):
         return (
@@ -133,7 +164,7 @@ def handle_conceptual_and_operational_inquiry(
             "| **Hybrid** | **NO** | **YES (Target Lockout)** | **Client Data Transfer** (Bulk record migration) |\n"
             "| **Online** | **NO** | **NO** | **File Management & UI Changes** (Live background execution) |\n\n"
             "---\n"
-            "💬 *Would you like to schedule a Client Data Transfer, or do you have any questions about prerequisites and maintenance windows?*"
+            "💬 *Whenever you are ready, please specify your approved Maintenance Window, or let me know if you have any other questions!*"
         )
 
     if is_offline_query or (is_exec_mode_query and "offline" in q):
@@ -264,6 +295,11 @@ async def generate_response_node(state: AgentState) -> Dict[str, Any]:
             history_lines.append(f"{role.capitalize()}: {content}")
     history_text = "\n".join(history_lines[-8:])
 
+    # Format grounding context from RAG retrieval
+    retrieval_context = state.get("retrieval_context") or []
+    rag_snippets = [doc.get("content", "").strip() for doc in retrieval_context if doc.get("content")]
+    rag_context_text = ("\n\nGrounding Knowledge Base Context (from RAG):\n" + "\n---\n".join(rag_snippets)) if rag_snippets else ""
+
     # 0. If ticket draft is prepared, present it immediately
     if draft_data:
         title = draft_data.get("title", "Support Request")
@@ -298,10 +334,12 @@ async def generate_response_node(state: AgentState) -> Dict[str, Any]:
                 "You are SupportHub AI, an expert Enterprise Application Support Specialist.\n"
                 "The user is asking an operational or conceptual question about system execution modes or downtime policies.\n\n"
                 f"Conversation History:\n{history_text if history_text else 'None'}\n\n"
+                f"{rag_context_text}\n\n"
                 f"User Question: {last_user_msg}\n\n"
-                "Answer thoroughly, accurately, conversationally, and friendly in clean Markdown with bullet points. Explain why hybrid needs user lockout without full server downtime."
+                "Answer thoroughly, accurately, conversationally, and friendly in clean Markdown with bullet points. Explain why hybrid needs user lockout without full server downtime.\n"
+                "If an ongoing ticket preparation is active, remind them at the end to provide their maintenance window whenever ready."
             )
-            llm_res = await call_ollama(llm_prompt, preferred_model=preferred_model)
+            llm_res = await call_ollama(llm_prompt, preferred_model=preferred_model, task_tier="mid")
             if llm_res:
                 return {"response_text": llm_res}
         return {"response_text": conceptual_reply}
@@ -367,7 +405,7 @@ async def generate_response_node(state: AgentState) -> Dict[str, Any]:
                     f"3. Cover Definition, Execution Mode ({act_def.execution_mode}), Downtime Requirement ({act_def.downtime_description}), Plain English Analogy, Prerequisites, and Risk Notice.\n\n"
                     f"Response in clean Markdown:"
                 )
-                llm_reply = await call_ollama(single_act_prompt, preferred_model=preferred_model)
+                llm_reply = await call_ollama(single_act_prompt, preferred_model=preferred_model, task_tier="mid")
                 if llm_reply:
                     return {"response_text": llm_reply}
             return {"response_text": format_single_activity_comprehensive_explanation(act_def)}
@@ -386,7 +424,7 @@ async def generate_response_node(state: AgentState) -> Dict[str, Any]:
                 f"Staff Member Query: {last_user_msg}\n\n"
                 "Technical Advisor Response in Markdown:"
             )
-            llm_reply = await call_ollama(staff_prompt)
+            llm_reply = await call_ollama(staff_prompt, task_tier="strong")
             if llm_reply:
                 return {"response_text": llm_reply}
 
@@ -415,8 +453,25 @@ async def generate_response_node(state: AgentState) -> Dict[str, Any]:
             )
         }
 
-    # 1. Out-of-scope / non-technical topic handler (Standardized Enterprise Support Team response)
+    # 1. Out-of-scope / non-technical topic handler (Polite and courteous enterprise guidance)
     if intent in ("out_of_scope", "NON_TECHNICAL"):
+        if settings.LLM_PROVIDER != "mock":
+            non_tech_prompt = (
+                "You are SupportHub AI, an expert, polite, and courteous Enterprise Application Support Specialist.\n"
+                f"User Message: {last_user_msg}\n\n"
+                "Instructions:\n"
+                "1. Courteously and politely acknowledge the user's message with a warm, friendly tone.\n"
+                "2. Gently clarify that as an Enterprise Application Support Specialist, your role is dedicated to helping users with our 4 core technical application activities:\n"
+                "   - Application UI Maintenance (Online, No Downtime)\n"
+                "   - File Management Operations (Online, No Downtime)\n"
+                "   - Client Data Transfer (Hybrid, User Lockout)\n"
+                "   - Application Version Maintenance (Offline, Planned Downtime)\n"
+                "3. Ask warmly how you can assist them with any technical issues, questions, or maintenance requests today.\n"
+                "4. Keep the response polite, empathetic, and concise in clean Markdown."
+            )
+            llm_reply = await call_ollama(non_tech_prompt, task_tier="mid")
+            if llm_reply:
+                return {"response_text": llm_reply}
         return {"response_text": SUPPORT_TEAM_OUT_OF_SCOPE_RESPONSE}
 
     # 2. Ticket status handler
@@ -447,7 +502,7 @@ async def generate_response_node(state: AgentState) -> Dict[str, Any]:
                 f"User Message: {last_user_msg}\n\n"
                 "Respond directly and conversationally to the user in a helpful, professional tone."
             )
-            llm_res = await call_ollama(dynamic_prompt)
+            llm_res = await call_ollama(dynamic_prompt, task_tier="mid")
             if llm_res:
                 return {"response_text": llm_res}
 
@@ -495,6 +550,47 @@ async def generate_response_node(state: AgentState) -> Dict[str, Any]:
 
         # Case A: Prerequisites are confirmed, but Maintenance Window / Downtime is still needed
         if not is_prereq_missing and is_window_missing:
+            q_lower = last_user_msg.lower()
+            is_user_asking_question = (
+                "?" in last_user_msg or
+                any(k in q_lower for k in [
+                    "right", "correct", "true", "lock", "lockout", "downtime", "offline", "online", "hybrid",
+                    "why", "what", "how", "will", "does", "is it", "only", "server", "mean", "confirm"
+                ]) or
+                conceptual_reply is not None
+            )
+
+            # If user is asking a question or seeking confirmation, answer it directly!
+            if is_user_asking_question:
+                if conceptual_reply:
+                    return {"response_text": conceptual_reply}
+
+                if settings.LLM_PROVIDER != "mock":
+                    dt_win_spec = (
+                        "7 Hours DT in 'From: DD/MM/YYYY HH:MM to To: DD/MM/YYYY HH:MM' format"
+                        if act_def.activity_code == "CLIENT_DATA_TRANSFER"
+                        else "1 Hour DT in 'From: DD/MM/YYYY HH:MM to To: DD/MM/YYYY HH:MM' format"
+                    )
+                    llm_prompt = (
+                        "You are SupportHub AI, an expert Enterprise Application Support Specialist.\n"
+                        f"The user previously confirmed prerequisites for {act_def.activity_name}, and is now asking a question / clarification before specifying their maintenance window.\n\n"
+                        f"Conversation History:\n{history_text if history_text else 'None'}\n\n"
+                        f"{rag_context_text}\n\n"
+                        f"Activity Details:\n"
+                        f"- Activity: {act_def.activity_name} ({act_def.activity_code})\n"
+                        f"- Execution Mode: {act_def.execution_mode} ({act_def.downtime_description})\n"
+                        f"- Summary: {act_def.customer_summary}\n"
+                        f"- Analogy: {act_def.customer_analogy}\n\n"
+                        f"User Question: {last_user_msg}\n\n"
+                        "Instructions:\n"
+                        "1. Answer their specific question directly, warmly, and accurately in Markdown (confirming user lockout vs server downtime).\n"
+                        f"2. At the end, politely invite them to provide their planned maintenance window ({dt_win_spec}) whenever ready to draft their ticket.\n"
+                        "3. DO NOT repeat the static 'Prerequisites Confirmed' template."
+                    )
+                    llm_reply = await call_ollama(llm_prompt, preferred_model=preferred_model, task_tier="mid")
+                    if llm_reply:
+                        return {"response_text": llm_reply}
+
             mode_desc = "Planned Downtime Required" if act_def.execution_mode == "Offline" else "User Lockout Required"
 
             # Check if prerequisites were already confirmed in a PRIOR turn
@@ -514,13 +610,27 @@ async def generate_response_node(state: AgentState) -> Dict[str, Any]:
                     f"Thank you for confirming that all prerequisites for **{act_def.activity_name}** are complete and verified. Now, let's schedule your maintenance window."
                 )
 
+            if act_def.activity_code == "CLIENT_DATA_TRANSFER":
+                mode_desc = "User Lockout Required (7 Hours)"
+                dt_detail = (
+                    f"⏱️ **Action Required — Downtime / Maintenance Window (7 Hours DT):**\n"
+                    f"Because **Client Data Transfer** requires a **7-Hour User Lockout** window, please specify your approved schedule in **From and To** format:\n"
+                    f"- **Format:** `From: DD/MM/YYYY HH:MM to To: DD/MM/YYYY HH:MM (Timezone)` (7 Hours Total)\n"
+                    f"- **Example:** `From: 25/09/2026 22:00 to To: 26/09/2026 05:00 UTC` *(7 Hours User Lockout DT)*"
+                )
+            else:
+                mode_desc = "Planned Downtime Required (1 Hour)"
+                dt_detail = (
+                    f"⏱️ **Action Required — Downtime / Maintenance Window (1 Hour DT):**\n"
+                    f"Because **Application Version Maintenance** requires a **1-Hour Planned Downtime** window, please specify your approved schedule in **From and To** format:\n"
+                    f"- **Format:** `From: DD/MM/YYYY HH:MM to To: DD/MM/YYYY HH:MM (Timezone)` (1 Hour Total)\n"
+                    f"- **Example:** `From: 25/09/2026 22:00 to To: 25/09/2026 23:00 UTC` *(1 Hour Planned Downtime DT)*"
+                )
+
             response_text = (
                 f"{intro}\n\n"
                 f"Because this operation runs in **{act_def.execution_mode} Mode** (`{mode_desc}`), specifying your planned maintenance timeframe is mandatory.\n\n"
-                f"⏱️ **Action Required:**\n"
-                f"Please specify your **approved Downtime / Maintenance Window** in the following format:\n"
-                f"- **Format:** `DD/MM/YYYY HH:MM to HH:MM (Timezone)`\n"
-                f"- **Examples:** `15/09/2026 22:00 to 02:00 UTC` or `15/09/2026 10:00 PM to 02:00 AM IST`\n\n"
+                f"{dt_detail}\n\n"
                 f"Once you provide the maintenance window, our team will immediately generate your official ticket draft!"
             )
             return {"response_text": response_text}
@@ -552,10 +662,20 @@ async def generate_response_node(state: AgentState) -> Dict[str, Any]:
             detail_intro = "✅ **Operation Details Noted:** Modifying application file access and permissions is supported under **File Management Operations** (`Online · No Downtime`).\n\n"
 
         if act_def.execution_mode in ["Offline", "Hybrid"]:
+            if act_def.activity_code == "CLIENT_DATA_TRANSFER":
+                dt_instructions = (
+                    "2. **Downtime / Maintenance Window (7 Hours DT):** Client Data Transfer requires an approved **7-Hour User Lockout window**. "
+                    "Please specify your approved schedule in **From and To** format (e.g., `From: 25/09/2026 22:00 to To: 26/09/2026 05:00 UTC` — 7 Hours Total)."
+                )
+            else:
+                dt_instructions = (
+                    "2. **Downtime / Maintenance Window (1 Hour DT):** Application Version Maintenance requires an approved **1-Hour Planned Downtime window**. "
+                    "Please specify your approved schedule in **From and To** format (e.g., `From: 25/09/2026 22:00 to To: 25/09/2026 23:00 UTC` — 1 Hour Total)."
+                )
             action_req = (
                 f"**Action Required:**\n"
                 f"1. **Prerequisites Status:** Have all of the above prerequisites been completed and verified? *(If any prerequisite is pending, please complete it before proceeding.)*\n"
-                f"2. **Downtime / Maintenance Window:** Please specify your approved maintenance window in the format `DD/MM/YYYY HH:MM to HH:MM (Timezone)` (e.g., `15/09/2026 22:00 to 02:00 UTC` or `15/09/2026 10:00 PM to 02:00 AM IST`)."
+                f"{dt_instructions}"
             )
             heading_title = f"### 🛠️ **{act_def.activity_name} — Prerequisites & Maintenance Window Verification**\n\n"
         else:
@@ -584,7 +704,7 @@ async def generate_response_node(state: AgentState) -> Dict[str, Any]:
             f"Missing Details needed: {', '.join(missing)}\n\n"
             f"Helpful Diagnostic Response in Markdown (DO NOT APOLOGIZE):"
         )
-        llm_reply = await call_ollama(prompt_content)
+        llm_reply = await call_ollama(prompt_content, task_tier="mid")
         if llm_reply:
             return {"response_text": llm_reply}
 

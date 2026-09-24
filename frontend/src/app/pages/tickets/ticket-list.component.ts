@@ -49,12 +49,14 @@ interface TicketSummary {
           <select class="form-input" [(ngModel)]="statusFilter" (change)="loadTickets()" title="Filter by status">
             <option value="">All Statuses</option>
             <option value="pending_admin_approval">Pending Admin Approval</option>
+            <option value="pending_cancellation">Pending Cancellation Review</option>
             <option value="open">Open</option>
             <option value="approved">Approved</option>
             <option value="assigned">Assigned</option>
             <option value="in_progress">In Progress</option>
             <option value="resolved">Resolved</option>
             <option value="closed">Closed</option>
+            <option value="cancelled">Cancelled</option>
             <option value="reopened">Reopened</option>
             <option value="archived">Archived (2-Month Retention)</option>
           </select>
@@ -144,8 +146,8 @@ interface TicketSummary {
             <label class="form-label">Maintenance Activity</label>
             <select class="form-select font-semibold" [(ngModel)]="newTicket.activity_code" name="activity" (change)="onActivityChange()" required>
               <option value="APPLICATION_UI">Application UI (Online · No Downtime · Priority: Medium)</option>
-              <option value="APPLICATION_VERSION">Application Version Maintenance (Offline · Planned Downtime · Priority: Critical)</option>
-              <option value="CLIENT_DATA_TRANSFER">Client Data Transfer (Hybrid · User Lockout · Priority: High)</option>
+              <option value="APPLICATION_VERSION">Application Version Maintenance (Offline · 1-Hour Planned Downtime · Priority: Critical)</option>
+              <option value="CLIENT_DATA_TRANSFER">Client Data Transfer (Hybrid · 7-Hour User Lockout · Priority: High)</option>
               <option value="FILE_MANAGEMENT">File Management (Online · No Downtime · Priority: Medium)</option>
             </select>
           </div>
@@ -159,7 +161,7 @@ interface TicketSummary {
               </span>
               <span class="activity-downtime-badge" [class.downtime-warn]="selectedActivityDef.downtime_required" [class.downtime-lockout]="selectedActivityDef.execution_mode === 'Hybrid'">
                 <span class="material-symbols-outlined">{{ selectedActivityDef.downtime_required ? 'power_off' : 'lock_clock' }}</span>
-                {{ selectedActivityDef.downtime_description }}
+                {{ selectedActivityDef.activity_code === 'CLIENT_DATA_TRANSFER' ? '7-Hour User Lockout Required' : (selectedActivityDef.activity_code === 'APPLICATION_VERSION' ? '1-Hour Planned Downtime Required' : selectedActivityDef.downtime_description) }}
               </span>
               <span *ngIf="selectedActivityDef.restricted_operation" class="activity-restricted-badge">
                 <span class="material-symbols-outlined">shield_lock</span>
@@ -202,12 +204,22 @@ interface TicketSummary {
 
               <label class="checkbox-label" *ngIf="selectedActivityDef.downtime_required || selectedActivityDef.execution_mode === 'Hybrid'">
                 <input type="checkbox" [(ngModel)]="downtimeAcknowledged" name="downtimeConfirm">
-                <span>I acknowledge and approve the scheduled <strong>{{ selectedActivityDef.downtime_description }}</strong> for this activity.</span>
+                <span>I acknowledge and approve the scheduled <strong>{{ selectedActivityDef.activity_code === 'CLIENT_DATA_TRANSFER' ? '7-Hour User Lockout' : (selectedActivityDef.activity_code === 'APPLICATION_VERSION' ? '1-Hour Planned Downtime' : selectedActivityDef.downtime_description) }}</strong> window for this activity.</span>
               </label>
 
               <div class="form-group mt-2 mb-0" *ngIf="selectedActivityDef.downtime_required || selectedActivityDef.execution_mode === 'Hybrid'">
-                <label class="form-label text-accent">Approved Maintenance Window / Downtime Schedule</label>
-                <input type="text" class="form-input text-sm" placeholder="e.g. Saturday 11:00 PM - Sunday 02:00 AM UTC" [(ngModel)]="newTicket.prerequisites_notes" name="downtimeWindow">
+                <label class="form-label text-accent">
+                  Approved Downtime (DT) / Maintenance Window (From & To)
+                  <span *ngIf="selectedActivityDef.activity_code === 'CLIENT_DATA_TRANSFER'" class="text-warning font-bold">— 7 Hours DT Window</span>
+                  <span *ngIf="selectedActivityDef.activity_code === 'APPLICATION_VERSION'" class="text-warning font-bold">— 1 Hour DT Window</span>
+                </label>
+                <input 
+                  type="text" 
+                  class="form-input text-sm" 
+                  [placeholder]="selectedActivityDef.activity_code === 'CLIENT_DATA_TRANSFER' ? 'e.g. From 25/09/2026 22:00 to 26/09/2026 05:00 UTC (7 Hours DT)' : 'e.g. From 25/09/2026 22:00 to 25/09/2026 23:00 UTC (1 Hour DT)'" 
+                  [(ngModel)]="newTicket.prerequisites_notes" 
+                  name="downtimeWindow"
+                >
               </div>
             </div>
           </div>
@@ -257,13 +269,13 @@ interface TicketSummary {
   styles: [`
     .view-panel { padding: 0; }
     .view-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
-    .view-title { font-family: var(--font-heading); font-size: 1.4rem; font-weight: 800; color: #ffffff; letter-spacing: -0.01em; }
+    .view-title { font-family: var(--font-heading); font-size: 1.4rem; font-weight: 800; color: var(--text-main); letter-spacing: -0.01em; }
     .view-desc { color: var(--text-muted); font-size: 0.82rem; margin-top: 2px; }
     
     .filters-bar { display: flex; gap: 14px; margin-bottom: 20px; align-items: center; }
     .search-input-wrap { flex: 1; position: relative; display: flex; align-items: center; }
     .search-icon { position: absolute; left: 14px; color: var(--text-muted); }
-    .search-input { width: 100%; padding: 10px 16px 10px 42px; border-radius: var(--radius-sm); background: #000000; border: 1px solid var(--corona-border); color: #ffffff; font-family: inherit; font-size: 0.85rem; outline: none; }
+    .search-input { width: 100%; padding: 10px 16px 10px 42px; border-radius: var(--radius-sm); background: var(--corona-surface-elevated); border: 1px solid var(--corona-border); color: var(--text-main); font-family: inherit; font-size: 0.85rem; outline: none; }
     .search-input:focus { border-color: var(--corona-purple); }
     .filter-dropdowns { min-width: 200px; }
     
@@ -275,7 +287,7 @@ interface TicketSummary {
     .mat-table tr:hover td { background: rgba(255, 255, 255, 0.02); }
     
     .ticket-num { font-weight: 700; color: var(--corona-purple); font-family: var(--font-heading); }
-    .category-chip { display: inline-block; white-space: nowrap; padding: 4px 10px; border-radius: 4px; background: #000000; border: 1px solid var(--corona-border); font-size: 0.75rem; color: var(--text-light); font-weight: 600; }
+    .category-chip { display: inline-block; white-space: nowrap; padding: 4px 10px; border-radius: 4px; background: var(--corona-surface-elevated); border: 1px solid var(--corona-border); font-size: 0.75rem; color: var(--text-light); font-weight: 600; }
     
     .status-badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.68rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; }
     .status-open { background: rgba(255, 171, 0, 0.15); color: var(--corona-orange); }
@@ -285,6 +297,7 @@ interface TicketSummary {
     .status-resolved { background: rgba(0, 210, 91, 0.15); color: var(--corona-green); }
     .status-closed { background: rgba(108, 114, 147, 0.15); color: var(--text-muted); }
     .status-cancelled { background: rgba(252, 66, 74, 0.15); color: var(--corona-red); }
+    .status-pending_cancellation { background: rgba(252, 66, 74, 0.15); color: var(--corona-red); border: 1px solid rgba(252, 66, 74, 0.3); }
     .status-pending_manager_routing { background: rgba(255, 171, 0, 0.15); color: var(--corona-orange); }
     .status-pending_admin_approval { background: rgba(252, 66, 74, 0.15); color: var(--corona-red); }
     .status-approved { background: rgba(0, 210, 91, 0.15); color: var(--corona-green); }
@@ -299,13 +312,13 @@ interface TicketSummary {
       gap: 12px;
       padding: 10px 16px;
       border-radius: var(--radius-sm);
-      background: #000000;
+      background: var(--corona-surface-elevated);
       border: 1px solid var(--corona-border);
       font-size: 0.8rem;
       color: var(--text-muted);
     }
     .retention-icon { color: var(--corona-orange); font-size: 20px; }
-    .retention-text strong { color: #ffffff; }
+    .retention-text strong { color: var(--text-main); }
     .mb-4 { margin-bottom: 16px; }
     .priority-low { color: var(--corona-green); }
     .priority-medium { color: var(--corona-orange); }
@@ -315,7 +328,7 @@ interface TicketSummary {
     .btn { padding: 8px 16px; border-radius: var(--radius-sm); font-family: inherit; font-weight: 600; font-size: 0.85rem; border: 1px solid transparent; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: var(--transition); }
     .btn-primary { background: var(--corona-green); color: #000; font-weight: 700; }
     .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
-    .btn-outlined { background: transparent; border-color: var(--corona-border); color: #ffffff; }
+    .btn-outlined { background: transparent; border-color: var(--corona-border); color: var(--text-main); }
     .btn-outlined:hover { background: rgba(255, 255, 255, 0.05); border-color: var(--corona-purple); }
     .btn-danger-outlined { background: transparent; border-color: rgba(252, 66, 74, 0.3); color: var(--corona-red); }
     .btn-danger-outlined:hover { background: rgba(252, 66, 74, 0.15); border-color: var(--corona-red); }
@@ -325,11 +338,11 @@ interface TicketSummary {
     .modal-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(8px); z-index: 1000; display: grid; place-items: center; padding: 20px; }
     .modal-dialog { width: min(720px, 100%); max-height: 90vh; background: var(--corona-surface); border: 1px solid var(--corona-border); border-radius: var(--radius-sm); display: flex; flex-direction: column; padding: 24px; overflow-y: auto; box-shadow: var(--shadow-card); }
     .modal-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 18px; border-bottom: 1px solid var(--corona-border); padding-bottom: 14px; }
-    .modal-title { font-family: var(--font-heading); font-size: 1.2rem; font-weight: 700; color: #ffffff; }
+    .modal-title { font-family: var(--font-heading); font-size: 1.2rem; font-weight: 700; color: var(--text-main); }
     .icon-btn { background: transparent; border: none; color: var(--text-muted); cursor: pointer; padding: 6px; border-radius: 4px; display: grid; place-items: center; }
-    .icon-btn:hover { color: #ffffff; background: rgba(255, 255, 255, 0.05); }
+    .icon-btn:hover { color: var(--text-main); background: rgba(255, 255, 255, 0.05); }
     
-    .activity-detail-card { background: #000000; border: 1px solid var(--corona-border); border-radius: var(--radius-sm); padding: 16px; margin-bottom: 16px; }
+    .activity-detail-card { background: var(--corona-surface-elevated); border: 1px solid var(--corona-border); border-radius: var(--radius-sm); padding: 16px; margin-bottom: 16px; }
     .activity-badges-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
     .activity-mode-badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 4px; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; background: rgba(143, 95, 232, 0.15); color: var(--corona-purple); border: 1px solid rgba(143, 95, 232, 0.3); }
     .activity-mode-badge .material-symbols-outlined { font-size: 16px; }
@@ -347,23 +360,23 @@ interface TicketSummary {
     .prereq-title { display: flex; align-items: center; gap: 6px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px; }
     .prereq-title .material-symbols-outlined { font-size: 18px; }
     .prereq-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
-    .prereq-list li { display: flex; align-items: flex-start; gap: 8px; font-size: 0.82rem; color: #ffffff; line-height: 1.4; }
+    .prereq-list li { display: flex; align-items: flex-start; gap: 8px; font-size: 0.82rem; color: var(--text-main); line-height: 1.4; }
     .icon-check { font-size: 16px; color: var(--corona-green); flex-shrink: 0; margin-top: 2px; }
     
-    .risk-warning-box { display: flex; align-items: flex-start; gap: 10px; background: rgba(255, 171, 0, 0.08); border: 1px solid rgba(255, 171, 0, 0.3); padding: 10px 14px; border-radius: var(--radius-sm); color: #ffffff; font-size: 0.82rem; margin-bottom: 12px; }
+    .risk-warning-box { display: flex; align-items: flex-start; gap: 10px; background: rgba(255, 171, 0, 0.08); border: 1px solid rgba(255, 171, 0, 0.3); padding: 10px 14px; border-radius: var(--radius-sm); color: var(--text-main); font-size: 0.82rem; margin-bottom: 12px; }
     .risk-warning-box .material-symbols-outlined { font-size: 20px; flex-shrink: 0; color: var(--corona-orange); }
     
     .confirmations-box { display: flex; flex-direction: column; gap: 8px; padding-top: 8px; border-top: 1px solid var(--corona-border); }
-    .checkbox-label { display: flex; align-items: flex-start; gap: 10px; font-size: 0.82rem; color: #ffffff; cursor: pointer; line-height: 1.4; }
+    .checkbox-label { display: flex; align-items: flex-start; gap: 10px; font-size: 0.82rem; color: var(--text-main); cursor: pointer; line-height: 1.4; }
     .checkbox-label input { margin-top: 3px; accent-color: var(--corona-green); width: 16px; height: 16px; }
     
     .form-group { margin-bottom: 14px; }
     .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     .form-label { display: block; font-size: 0.72rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px; }
-    .form-input, .form-textarea, .form-select { width: 100%; padding: 8px 12px; border-radius: var(--radius-sm); background: #000000; border: 1px solid var(--corona-border); color: #ffffff; font-family: inherit; font-size: 0.85rem; outline: none; }
+    .form-input, .form-textarea, .form-select { width: 100%; padding: 8px 12px; border-radius: var(--radius-sm); background: var(--corona-surface-elevated); border: 1px solid var(--corona-border); color: var(--text-main); font-family: inherit; font-size: 0.85rem; outline: none; }
     .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
     
-    .font-semibold { font-weight: 600; color: #ffffff; }
+    .font-semibold { font-weight: 600; color: var(--text-main); }
     .text-muted { color: var(--text-muted); }
     .text-sm { font-size: 0.8rem; }
     .empty-state { text-align: center; color: var(--text-muted); padding: 24px; }
@@ -610,6 +623,8 @@ export class TicketListComponent implements OnInit {
       case 'in_progress': return 'In Progress';
       case 'assigned': return 'Assigned';
       case 'pending_admin_approval': return 'Approval Required';
+      case 'pending_cancellation': return 'Cancellation Review';
+      case 'cancelled': return 'Cancelled';
       case 'approved': return 'Approved';
       case 'reopened': return 'Reopened';
       case 'closed': return 'Closed';
@@ -623,6 +638,8 @@ export class TicketListComponent implements OnInit {
       case 'in_progress': return 'engineering';
       case 'assigned': return 'assignment_ind';
       case 'pending_admin_approval': return 'shield_lock';
+      case 'pending_cancellation': return 'cancel_presentation';
+      case 'cancelled': return 'cancel';
       case 'approved': return 'verified';
       case 'reopened': return 'priority_high';
       case 'closed': return 'check_circle';

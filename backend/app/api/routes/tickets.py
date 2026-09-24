@@ -10,6 +10,9 @@ from app.api.dependencies import get_current_user, get_db, require_role
 from app.models import User
 from app.schemas.common import PaginatedResponse
 from app.schemas.ticket import (
+    CancelApprovalRequest,
+    CancelRejectionRequest,
+    CancelTicketRequest,
     ReopenRequest,
     TicketCommentCreate,
     TicketCommentResponse,
@@ -67,6 +70,12 @@ async def list_tickets(
             assignee_name=t.assignee.full_name if t.assignee else None,
             created_at=t.created_at,
             updated_at=t.updated_at,
+            activity_code=t.activity_code,
+            operation_status=t.operation_status,
+            requires_admin_approval=t.requires_admin_approval,
+            execution_mode=t.execution_mode,
+            downtime_required=t.downtime_required,
+            routing_details=ticket_service.compute_routing_details(t),
         )
         for t in items
     ]
@@ -240,5 +249,40 @@ async def reopen_ticket_endpoint(
     ticket_service = TicketService(db)
     reason = reopen_data.reason if reopen_data else ""
     return await ticket_service.reopen_ticket(ticket_id, current_user, db, reason=reason)
+
+
+@router.post("/{ticket_id}/request-cancellation", response_model=TicketResponse)
+async def request_cancellation_endpoint(
+    ticket_id: str,
+    cancel_in: CancelTicketRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    ticket_service = TicketService(db)
+    return await ticket_service.request_cancellation(ticket_id, current_user, cancel_in.reason, db)
+
+
+@router.post("/{ticket_id}/approve-cancellation", response_model=TicketResponse)
+async def approve_cancellation_endpoint(
+    ticket_id: str,
+    body: Optional[CancelApprovalRequest] = None,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    ticket_service = TicketService(db)
+    notes = body.notes if body else None
+    return await ticket_service.approve_cancellation(ticket_id, current_user, notes, db)
+
+
+@router.post("/{ticket_id}/reject-cancellation", response_model=TicketResponse)
+async def reject_cancellation_endpoint(
+    ticket_id: str,
+    reject_in: CancelRejectionRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    ticket_service = TicketService(db)
+    return await ticket_service.reject_cancellation(ticket_id, current_user, reject_in.reason, db)
+
 
 

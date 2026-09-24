@@ -5,6 +5,7 @@ import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../services/auth.service';
 import { ThemeService } from '../../services/theme.service';
 import { ToastService } from '../../services/toast.service';
+import { environment } from '../../../environments/environment';
 
 interface ResolutionToast {
   ticketNumber: string;
@@ -55,8 +56,8 @@ interface ResolutionToast {
         </div>
       </div>
 
-      <!-- 3-DOTS USER ROLE & PROFILE MODAL -->
-      <div class="role-modal-backdrop" *ngIf="showRoleModal" (click)="showRoleModal = false">
+      <!-- 3-DOTS USER ROLE & PROFILE MODAL (Dev Feature Flag) -->
+      <div class="role-modal-backdrop" *ngIf="enableDevProfileSwitcher && showRoleModal" (click)="showRoleModal = false">
         <div class="role-modal-card animate-pop" (click)="$event.stopPropagation()">
           <div class="role-modal-header">
             <div class="role-modal-title">
@@ -197,6 +198,16 @@ interface ResolutionToast {
         </div>
 
         <div class="header-actions-section">
+          <!-- Dark / Light Mode Switch -->
+          <button type="button" class="theme-toggle-btn" (click)="theme.toggleTheme()" [title]="theme.isDarkTheme() ? 'Switch to Light Mode' : 'Switch to Dark Mode'">
+            <div class="theme-toggle-track" [class.is-light]="!theme.isDarkTheme()">
+              <span class="material-symbols-outlined theme-icon-sun">light_mode</span>
+              <span class="material-symbols-outlined theme-icon-moon">dark_mode</span>
+              <div class="theme-toggle-thumb"></div>
+            </div>
+            <span class="theme-toggle-label">{{ theme.isDarkTheme() ? 'Dark' : 'Light' }}</span>
+          </button>
+
           <!-- + Create Ticket button (Only for User profile) -->
           <button class="btn-create-project" *ngIf="auth.isUser()" (click)="openCreateModal()">
             <span class="material-symbols-outlined">add</span>
@@ -214,8 +225,8 @@ interface ResolutionToast {
               <span class="dropdown-role-label">{{ auth.roleDisplayName() }}</span>
             </div>
             
-            <!-- 3-Dots Button for Profile Switching (Right Corner) -->
-            <button class="icon-switch-profile-btn" (click)="showRoleModal = true" title="Switch User Profile & Roles">
+            <!-- 3-Dots Button for Profile Switching (Gated by Feature Flag) -->
+            <button class="icon-switch-profile-btn" *ngIf="enableDevProfileSwitcher" (click)="showRoleModal = true" title="Switch User Profile & Roles">
               <span class="material-symbols-outlined">more_vert</span>
             </button>
 
@@ -274,6 +285,14 @@ interface ResolutionToast {
               </div>
               <span class="nav-label">AI Assistant</span>
               <span class="nav-pill-badge">{{ getActiveModelName() }}</span>
+            </a>
+
+            <a routerLink="/model-monitoring" routerLinkActive="active" class="corona-nav-item">
+              <div class="nav-icon-circle icon-green">
+                <span class="material-symbols-outlined">monitoring</span>
+              </div>
+              <span class="nav-label">Model Monitoring</span>
+              <span class="nav-pill-badge" style="background: rgba(0, 210, 91, 0.2); color: var(--corona-green);">Active</span>
             </a>
           </nav>
 
@@ -369,7 +388,7 @@ interface ResolutionToast {
       font-size: 1.45rem;
       font-weight: 800;
       letter-spacing: -0.02em;
-      color: #ffffff;
+      color: var(--text-main);
     }
 
     .corona-logo-sub {
@@ -385,6 +404,77 @@ interface ResolutionToast {
       display: flex;
       align-items: center;
       gap: 16px;
+    }
+
+    /* THEME TOGGLE SWITCH */
+    .theme-toggle-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--corona-surface-elevated);
+      border: 1px solid var(--corona-border);
+      border-radius: var(--radius-full);
+      padding: 4px 12px 4px 6px;
+      cursor: pointer;
+      transition: var(--transition);
+      color: var(--text-main);
+      font-family: inherit;
+      user-select: none;
+    }
+    .theme-toggle-btn:hover {
+      border-color: var(--corona-purple);
+      box-shadow: 0 0 10px rgba(143, 95, 232, 0.25);
+    }
+    .theme-toggle-track {
+      position: relative;
+      width: 44px;
+      height: 24px;
+      background: rgba(0, 0, 0, 0.4);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 4px;
+      border: 1px solid var(--corona-border);
+      transition: all 0.25s ease;
+    }
+    .theme-toggle-track.is-light {
+      background: rgba(255, 171, 0, 0.15);
+      border-color: rgba(255, 171, 0, 0.4);
+    }
+    .theme-icon-sun {
+      font-size: 14px !important;
+      color: #ffab00;
+      z-index: 1;
+      line-height: 1;
+    }
+    .theme-icon-moon {
+      font-size: 14px !important;
+      color: #8f5fe8;
+      z-index: 1;
+      line-height: 1;
+    }
+    .theme-toggle-thumb {
+      position: absolute;
+      top: 2px;
+      left: 3px;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--corona-purple), var(--corona-blue));
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+      transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), background 0.25s ease;
+    }
+    .theme-toggle-track.is-light .theme-toggle-thumb {
+      transform: translateX(19px);
+      background: linear-gradient(135deg, #ffab00, #ff8800);
+      box-shadow: 0 1px 5px rgba(255, 171, 0, 0.5);
+    }
+    .theme-toggle-label {
+      font-size: 0.76rem;
+      letter-spacing: 0.04em;
+      font-weight: 700;
+      text-transform: uppercase;
     }
 
     .btn-create-project {
@@ -410,7 +500,7 @@ interface ResolutionToast {
       display: flex;
       align-items: center;
       gap: 12px;
-      background: #000000;
+      background: var(--corona-surface-elevated);
       border: 1px solid var(--corona-border);
       padding: 5px 14px;
       border-radius: var(--radius-sm);
@@ -451,7 +541,7 @@ interface ResolutionToast {
     .dropdown-user-name {
       font-size: 0.85rem;
       font-weight: 700;
-      color: #ffffff;
+      color: var(--text-main);
       line-height: 1.2;
     }
 
@@ -516,7 +606,7 @@ interface ResolutionToast {
       align-items: center;
       gap: 12px;
       padding: 10px;
-      background-color: #000000;
+      background-color: var(--corona-surface-elevated);
       border: 1px solid var(--corona-border);
       border-radius: var(--radius-sm);
       margin-bottom: 12px;
@@ -558,7 +648,7 @@ interface ResolutionToast {
     .sidebar-name {
       font-size: 0.88rem;
       font-weight: 700;
-      color: #ffffff;
+      color: var(--text-main);
     }
 
     .sidebar-role-tag {
@@ -581,7 +671,7 @@ interface ResolutionToast {
     }
     .sidebar-dots-btn:hover {
       background: rgba(255, 255, 255, 0.08);
-      color: #ffffff;
+      color: var(--text-main);
     }
 
     .sidebar-section-header {
@@ -613,11 +703,11 @@ interface ResolutionToast {
     }
     .corona-nav-item:hover {
       background: rgba(255, 255, 255, 0.04);
-      color: #ffffff;
+      color: var(--text-main);
     }
     .corona-nav-item.active {
-      background: #000000;
-      color: #ffffff;
+      background: var(--corona-surface-elevated);
+      color: var(--corona-purple);
       border-left: 3px solid var(--corona-purple);
     }
 
@@ -653,7 +743,7 @@ interface ResolutionToast {
       gap: 8px;
       padding: 8px 12px;
       border-radius: var(--radius-sm);
-      background: #000000;
+      background: var(--corona-surface-elevated);
       border: 1px solid var(--corona-border);
       font-size: 0.75rem;
       font-weight: 600;
@@ -894,7 +984,7 @@ interface ResolutionToast {
     .icon-close-btn:hover { color: #ffffff; }
 
     .role-current-box {
-      background: #000000;
+      background: var(--corona-surface-elevated);
       border: 1px solid var(--corona-border);
       border-radius: var(--radius-sm);
       padding: 14px 18px;
@@ -919,7 +1009,7 @@ interface ResolutionToast {
       font-weight: 800;
       font-size: 1.1rem;
     }
-    .rc-name { font-size: 1rem; color: #ffffff; }
+    .rc-name { font-size: 1rem; color: var(--text-main); }
     .rc-meta {
       display: flex;
       align-items: center;
@@ -966,7 +1056,7 @@ interface ResolutionToast {
     }
 
     .rf-pill {
-      background: #000000;
+      background: var(--corona-surface-elevated);
       border: 1px solid var(--corona-border);
       color: var(--text-muted);
       font-size: 0.72rem;
@@ -978,7 +1068,7 @@ interface ResolutionToast {
     }
     .rf-pill:hover {
       border-color: var(--corona-purple);
-      color: #ffffff;
+      color: var(--text-main);
     }
     .rf-pill.active-pill {
       background: var(--corona-purple);
@@ -996,7 +1086,7 @@ interface ResolutionToast {
     }
 
     .role-card {
-      background: #000000;
+      background: var(--corona-surface-elevated);
       border: 1px solid var(--corona-border);
       border-radius: var(--radius-sm);
       padding: 14px;
@@ -1027,7 +1117,7 @@ interface ResolutionToast {
       color: #ffffff;
     }
 
-    .role-user-name { font-size: 0.88rem; color: #ffffff; }
+    .role-user-name { font-size: 0.88rem; color: var(--text-main); }
     .role-user-email { font-size: 0.75rem; color: var(--text-muted); }
     .role-desc {
       font-size: 0.75rem;
@@ -1047,7 +1137,7 @@ interface ResolutionToast {
       cursor: pointer;
       transition: var(--transition);
     }
-    .btn-cancel:hover { background: rgba(255, 255, 255, 0.05); color: #ffffff; }
+    .btn-cancel:hover { background: rgba(255, 255, 255, 0.05); color: var(--text-main); }
 
     .icon-btn-mini {
       background: transparent;
@@ -1058,13 +1148,13 @@ interface ResolutionToast {
       place-items: center;
       padding: 2px;
     }
-    .icon-btn-mini:hover { color: #ffffff; }
+    .icon-btn-mini:hover { color: var(--text-main); }
     .demo-hint-text {
       font-size: 0.72rem;
       color: var(--text-muted);
     }
     .demo-hint-text code {
-      background: #000000;
+      background: var(--corona-surface-elevated);
       border: 1px solid var(--corona-border);
       padding: 1px 4px;
       border-radius: 3px;
@@ -1098,6 +1188,8 @@ export class ShellComponent implements OnInit, OnDestroy {
   router = inject(Router);
   cdr = inject(ChangeDetectorRef);
   toastService = inject(ToastService);
+
+  readonly enableDevProfileSwitcher = environment.enableDevProfileSwitcher;
 
   sseConnected = false;
   isLoading = false;

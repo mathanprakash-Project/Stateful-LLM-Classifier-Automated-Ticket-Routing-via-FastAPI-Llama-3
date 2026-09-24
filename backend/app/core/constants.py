@@ -22,6 +22,7 @@ class TicketStatus(str, Enum):
     CLOSED = "closed"
     REOPENED = "reopened"
     CANCELLED = "cancelled"
+    PENDING_CANCELLATION = "pending_cancellation"
     PENDING_MANAGER_ROUTING = "pending_manager_routing"
     PENDING_ADMIN_APPROVAL = "pending_admin_approval"
     APPROVED = "approved"

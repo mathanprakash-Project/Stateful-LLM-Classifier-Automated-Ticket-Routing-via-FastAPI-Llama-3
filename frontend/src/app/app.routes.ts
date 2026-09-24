@@ -7,6 +7,7 @@ import { TicketListComponent } from './pages/tickets/ticket-list.component';
 import { TicketDetailComponent } from './pages/tickets/ticket-detail.component';
 import { TicketStatusComponent } from './pages/ticket-status/ticket-status.component';
 import { ChatComponent } from './pages/chat/chat.component';
+import { ModelMonitoringComponent } from './pages/model-monitoring/model-monitoring.component';
 
 export const routes: Routes = [
   { path: 'login', component: LoginComponent },
@@ -20,6 +21,7 @@ export const routes: Routes = [
       { path: 'tickets', component: TicketListComponent },
       { path: 'tickets/:id', component: TicketDetailComponent },
       { path: 'assistant', component: ChatComponent },
+      { path: 'model-monitoring', component: ModelMonitoringComponent },
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' }
     ]
   },

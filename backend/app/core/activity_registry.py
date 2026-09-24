@@ -44,13 +44,13 @@ ACTIVITY_REGISTRY: dict[str, ActivityDefinition] = {
         ticket_eligible=True,
         execution_mode="Offline",
         downtime_required=True,
-        downtime_description="Yes (Planned Downtime)",
-        customer_summary="System executables and engine files are locked while running; all services must be stopped to apply core runtime upgrades.",
-        customer_analogy="Think of this as upgrading the engine of a car. Because we are replacing the core moving parts that run the entire software platform, the system must be turned off briefly during the maintenance window so the new files can be safely swapped in.",
+        downtime_description="Yes (1-Hour Planned Downtime Required)",
+        customer_summary="System executables and engine files are locked while running; services are stopped during an approved 1-hour planned downtime window to safely apply runtime upgrades.",
+        customer_analogy="Think of this as upgrading the engine of a car. Because we are replacing core runtime binaries, services are turned off for a planned 1-hour maintenance window so new files can be safely swapped in.",
         prerequisites=[
             "Target version compatibility check with operating system and database layers.",
             "Verified full backup of the existing global application directory.",
-            "Approved maintenance window to halt system services.",
+            "Approved 1-hour maintenance window to halt system services.",
             "Root/admin host permissions to set file execution rights.",
         ],
         risk_warning="Performing version maintenance without compatibility checks or an active backup may lead to prolonged system downtime or executable startup failures.",
@@ -70,14 +70,14 @@ ACTIVITY_REGISTRY: dict[str, ActivityDefinition] = {
         ticket_eligible=True,
         execution_mode="Hybrid",
         downtime_required=False,
-        downtime_description="No Full Downtime (User Lockout Required)",
-        customer_summary="System remains powered on, but active users are locked out from target/source environments to avoid data conflicts.",
-        customer_analogy="The system stays powered on, but we temporarily lock out user logins in the target test system. This ensures that while massive amounts of data are being copied over the network, nobody creates partial entries that could corrupt the transfer.",
+        downtime_description="No Full Server Downtime (7-Hour User Lockout Required)",
+        customer_summary="System servers remain powered on, but active users are locked out from target/source environments for an approved 7-hour window to avoid data conflicts.",
+        customer_analogy="The application server remains powered on, but we temporarily lock out user logins for an approved 7-hour window. This ensures that while massive amounts of data are being replicated over the network, nobody creates partial entries that could corrupt the bulk transfer.",
         prerequisites=[
             "Pre-configured target environment structure.",
             "Active, authorized network communication connection between source and target systems.",
             "Sufficient database disk storage on the target system.",
-            "User access temporarily locked on participating environments.",
+            "User access temporarily locked on participating environments (7-hour window).",
         ],
         risk_warning="Attempting data transfer without target user lockout or insufficient storage can result in partial data corruption or network transmission timeouts.",
         approval_workflow="admin_to_agent",
@@ -351,10 +351,10 @@ def is_greeting_or_activity_overview(text: str) -> bool:
 
     # Check for queries specifically asking for the list, overview, or scope of activities
     activity_inquiry_patterns = [
-        r"\b(list|overview|summary|all|what are the)\b.*\bactivit(y|ies)\b",
-        r"\bactivit(y|ies)\b.*\b(list|overview|summary|options)\b",
+        r"\b(list|overview|summary|all|what are the|available)\b.*\bactivit(y|ies)\b",
+        r"\bactivit(y|ies)\b.*\b(list|overview|summary|options|available)\b",
         r"\bwhat (activities|services|operations) (do you|can you|are)\b",
-        r"\b(show|give|tell me|explain)\b.*\b(list|overview|summary)\b.*\bactivit(y|ies)\b",
+        r"\b(show|give|tell me|explain)\b.*\bactivit(y|ies)\b",
         r"\bcapabilit(y|ies)\b",
         r"\bwhat (can|do) you do\b",
         r"\bwhat do you support\b",
@@ -436,6 +436,10 @@ def check_downtime_window(text: str) -> bool:
         r"\b\d{1,2}\s*(hours?|hrs?)\b",
         r"\b(maintenance window|downtime window|window is|scheduled for|scheduled at|between \d|from \d)\b",
         r"\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b",
+        r"\bfrom\s+.+\s+to\s+.+\b",
+        r"\bfrom\s*:\s*.+\b",
+        r"\bdt\s*:\s*.+\b",
+        r"\b(7\s*hours?|1\s*hour|7\s*hrs?|1\s*hr)\b",
     ]
     return any(re.search(pat, lower) for pat in time_patterns)
 

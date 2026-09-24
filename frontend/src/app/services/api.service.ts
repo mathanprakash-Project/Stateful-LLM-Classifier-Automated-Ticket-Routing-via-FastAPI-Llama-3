@@ -35,4 +35,22 @@ export class ApiService {
   async delete(url: string): Promise<Response> {
     return this.fetchWithAuth(url, { method: 'DELETE' });
   }
+
+  // --- Cancellation Workflow ---
+  async requestTicketCancellation(ticketId: string, reason: string): Promise<Response> {
+    return this.post(`/api/tickets/${ticketId}/request-cancellation`, { reason });
+  }
+
+  async approveTicketCancellation(ticketId: string, notes?: string): Promise<Response> {
+    return this.post(`/api/tickets/${ticketId}/approve-cancellation`, { notes });
+  }
+
+  async rejectTicketCancellation(ticketId: string, reason: string): Promise<Response> {
+    return this.post(`/api/tickets/${ticketId}/reject-cancellation`, { reason });
+  }
+
+  // --- Model Monitoring Telemetry ---
+  async getModelMonitoringMetrics(): Promise<Response> {
+    return this.get('/api/metrics/model-monitoring');
+  }
 }

@@ -25,7 +25,10 @@ export class ThemeService {
 
   private applyThemeClass() {
     if (typeof document !== 'undefined') {
-      document.body.className = this._isDarkTheme() ? 'theme-dark' : 'theme-light';
+      const isDark = this._isDarkTheme();
+      document.body.classList.remove('theme-dark', 'theme-light');
+      document.body.classList.add(isDark ? 'theme-dark' : 'theme-light');
+      document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
     }
   }
 }

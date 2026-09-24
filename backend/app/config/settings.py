@@ -33,6 +33,14 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = "local"
     LOG_COSTS: bool = True
 
+    # Model Routing (Module 2: Cost Router)
+    MODEL_TIER_MICRO: str = "llama3.2:3b"       # Classification, simple checks
+    MODEL_TIER_MID: str = "llama3.2:3b"          # Extraction, draft generation
+    MODEL_TIER_STRONG: str = "llama3.2:3b"       # Complex reasoning, ambiguous cases
+
+    # Redis (Module 4: Durable State & Multi-Pod SSE)
+    REDIS_URL: str = "redis://localhost:6379/0"
+
     # Storage
     UPLOAD_DIR: str = "./uploads"
 

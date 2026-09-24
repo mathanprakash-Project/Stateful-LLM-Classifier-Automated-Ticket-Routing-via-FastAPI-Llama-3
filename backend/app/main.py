@@ -16,6 +16,7 @@ from app.api.routes import (
     category_router,
     user_router,
     event_router,
+    metrics_router,
 )
 from app.config.settings import settings
 from app.core.error_handlers import register_error_handlers
@@ -80,6 +81,7 @@ app.include_router(dashboard_router)
 app.include_router(category_router)
 app.include_router(user_router)
 app.include_router(event_router)
+app.include_router(metrics_router)
 
 
 # ---------------------------------------------------------------------------

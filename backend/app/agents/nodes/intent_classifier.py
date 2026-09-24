@@ -38,6 +38,7 @@ OUT_OF_SCOPE_KEYWORDS = [
 IT_KEYWORDS = [
     "activity", "activities", "maintenance", "operations",
     "button", "page", "screen", "login", "form", "field", "dropdown", "ui", "layout", "validation", "submit",
+    "icon", "menu", "hover", "modal", "dialog", "navbar", "sidebar", "tab",
     "application", "app", "version", "upgrade", "downgrade", "patch", "client", "transfer", "migrate", "data",
     "file", "upload", "download", "configuration", "error message", "not working", "broken", "missing",
     "server", "database", "db", "cpu", "memory", "disk", "restart", "infrastructure", "windows server", "linux",
@@ -94,6 +95,7 @@ def rule_based_intent_fallback(text: str, conversation_history: list = None) -> 
         "change access and permissions", "file access", "directory permissions", "folder permissions",
         "archive log", "archive logs", "archiving logs", "log cleanup", "cleanup script", "cleanup scripts",
         "housekeeping script", "housekeeping scripts", "storage cleanup", "upload file", "download file",
+        "delete file", "delete files", "remove file", "delete my", "file delete", "file deletion",
         "file sync", "file processing"
     ]
     if any(k in full_lower for k in file_management_keywords):
@@ -222,7 +224,7 @@ async def classify_intent_node(state: AgentState) -> Dict[str, Any]:
         clean_msgs = messages[-4:]
         history_text = "\n".join([f"{m.get('role', 'user')}: {m.get('content', '')}" for m in clean_msgs])
         prompt = f"{INTENT_CLASSIFIER_PROMPT}\n\nRecent Conversation:\n{history_text}\n\nLatest User Message: {user_msg}\n\nJSON Output:"
-        response = await call_ollama(prompt, format_json=True)
+        response = await call_ollama(prompt, format_json=True, task_tier="micro")
         if response:
             try:
                 parsed = json.loads(response)
@@ -260,11 +262,12 @@ async def classify_intent_node(state: AgentState) -> Dict[str, Any]:
         "file management", "files management", "file mangement", "files mangements",
         "file permission", "file permissions", "permission for the files", "permissions for the files",
         "permission change", "permissions change", "file access", "directory permissions",
-        "archive logs", "housekeeping script", "upload file", "download file"
+        "archive logs", "housekeeping script", "upload file", "download file",
+        "delete file", "delete files", "remove file", "delete my"
     ]):
         result["intent"] = "FILE_MANAGEMENT"
         result["activity_code"] = "FILE_MANAGEMENT"
-    elif any(k in user_lower for k in ["ui change", "button broken", "layout issue", "form field"]):
+    elif any(k in user_lower for k in ["ui change", "button broken", "layout issue", "form field", "hover", "icon", "color", "dropdown", "button"]):
         result["intent"] = "APPLICATION_UI"
         result["activity_code"] = "APPLICATION_UI"
 

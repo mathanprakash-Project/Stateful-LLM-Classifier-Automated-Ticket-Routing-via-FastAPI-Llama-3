@@ -8,6 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents import run_chat_turn
 from app.core.exceptions import NotFoundError, ValidationError
+from app.core.sse_publisher import sse_publisher
+from app.core.workflow_journal import workflow_journal
 from app.models import AITicketDraft, ChatMessage, ChatSession, User
 from app.repositories.category_repo import CategoryRepository
 from app.repositories.chat_repo import ChatRepository
@@ -57,18 +59,41 @@ class ChatService:
 
         logger.info("[CHAT_TURN_START] session_id=%s, model=%s, user_msg=%s", session.id, preferred_model, message_text)
 
-        # 3. Run agent turn
+        # 3. Run agent turn with workflow journal recording
         primary_role = user.roles[0].name.lower() if user.roles else "user"
-        agent_res = await run_chat_turn(
-            session_id=session.id,
-            user_id=user.id,
-            user_name=user.full_name,
-            user_message=message_text,
-            existing_messages=existing_msgs,
-            current_state=session.agent_state or {},
-            user_role=primary_role,
-            preferred_model=preferred_model,
+        journal_id = workflow_journal.record_step_start(
+            session_id=str(session.id),
+            step_name="agent_turn",
+            input_snapshot={"user_message": message_text, "user_role": primary_role},
+            actor_id=str(user.id),
         )
+
+        try:
+            agent_res = await run_chat_turn(
+                session_id=session.id,
+                user_id=user.id,
+                user_name=user.full_name,
+                user_message=message_text,
+                existing_messages=existing_msgs,
+                current_state=session.agent_state or {},
+                user_role=primary_role,
+                preferred_model=preferred_model,
+            )
+            workflow_journal.record_step_complete(
+                journal_id,
+                output_snapshot={
+                    "intent": agent_res.get("intent"),
+                    "activity_code": agent_res.get("activity_code"),
+                    "missing_fields": agent_res.get("missing_fields"),
+                    "has_draft": bool(agent_res.get("draft")),
+                    "has_consensus": bool(agent_res.get("consensus_result")),
+                    "rai_flags": agent_res.get("rai_flags"),
+                    "needs_human_approval": agent_res.get("needs_human_approval"),
+                },
+            )
+        except Exception as exc:
+            workflow_journal.record_step_failed(journal_id, str(exc))
+            raise
 
         logger.info("[CHAT_TURN_END] agent_res intent=%s, act=%s, missing=%s, draft=%s", agent_res.get("intent"), agent_res.get("activity_code"), agent_res.get("missing_fields"), bool(agent_res.get("draft")))
 
@@ -232,6 +257,13 @@ class ChatService:
             message_type="ticket_confirmation",
             metadata_info={"ticket_id": ticket.id, "ticket_number": ticket.ticket_number},
         )
+
+        # Publish multi-pod SSE events and update journal
+        try:
+            await sse_publisher.draft_approved(str(draft.id), str(ticket.id), str(user.id))
+            await sse_publisher.ticket_created(str(ticket.id), ticket.title, str(user.id))
+        except Exception as e:
+            logger.warning("Failed to publish SSE event in approve_draft: %s", e)
 
         return {
             "ticket_id": ticket.id,

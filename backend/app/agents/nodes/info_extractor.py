@@ -150,7 +150,7 @@ async def extract_info_node(state: AgentState) -> Dict[str, Any]:
             f"Existing Extracted Fields: {json.dumps(current_fields)}\n\n"
             f"JSON Output:"
         )
-        response = await call_ollama(prompt_content, format_json=True)
+        response = await call_ollama(prompt_content, format_json=True, task_tier="mid")
         if response:
             try:
                 parsed = json.loads(response)

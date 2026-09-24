@@ -93,7 +93,12 @@ def check_completeness_node(state: AgentState) -> Dict[str, Any]:
         if curr_msg:
             inquiry_user_msgs.append(curr_msg)
 
-    if act_def and act_def.prerequisites:
+    # Operational activities that require explicit user prerequisite and window verification
+    requires_user_prereqs = act_def and act_def.prerequisites and (
+        act_def.activity_code in ["APPLICATION_VERSION", "CLIENT_DATA_TRANSFER", "FILE_MANAGEMENT"]
+    )
+
+    if requires_user_prereqs:
         from app.core.activity_registry import is_prereq_explicitly_pending
         # If the user explicitly stated in their latest message that prerequisites are NOT done / pending
         if is_prereq_explicitly_pending(curr_msg):
@@ -110,7 +115,7 @@ def check_completeness_node(state: AgentState) -> Dict[str, Any]:
             if not has_downtime_window:
                 missing_fields.append("maintenance_window")
 
-    # Multi-turn diagnostic check for general tickets:
+    # Multi-turn diagnostic check for general / UI tickets:
     # If the user only sent a single brief message, prompt for diagnostic clarification.
     affected = extracted.get("affected_system")
     troubleshooting = extracted.get("troubleshooting_tried")
@@ -122,7 +127,7 @@ def check_completeness_node(state: AgentState) -> Dict[str, Any]:
         (affected or troubleshooting or impact)
     )
     
-    if user_turn_count < 2 and not is_very_detailed_first_message and not (act_def and act_def.prerequisites):
+    if user_turn_count < 2 and not is_very_detailed_first_message and not requires_user_prereqs:
         if not affected:
             missing_fields.append("affected_system")
         if not troubleshooting:

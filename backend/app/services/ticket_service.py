@@ -127,6 +127,7 @@ class TicketService:
             },
         )
 
+        ticket.routing_details = self.compute_routing_details(ticket)
         return ticket
 
     async def get_ticket(self, ticket_id: str, user: User) -> Ticket:
@@ -140,6 +141,7 @@ class TicketService:
             if ticket.created_by_id != user.id:
                 raise NotFoundError("Ticket", ticket_id)
 
+        ticket.routing_details = self.compute_routing_details(ticket)
         return ticket
 
     async def list_tickets(
@@ -477,6 +479,36 @@ class TicketService:
                 "status": "resolved",
             }
         )
+
+        # Module 1 Flywheel: Add resolution to Knowledge Base for continuous learning
+        try:
+            from app.core.knowledge_base import add_resolution_to_kb
+            from app.core.retrieval import get_retriever
+            add_resolution_to_kb(
+                get_retriever(),
+                {
+                    "id": str(ticket.ticket_number or ticket.id),
+                    "resolution": resolution_notes or "Resolved by agent",
+                    "issue_description": ticket.description or "",
+                    "category": ticket.category.name if ticket.category else "general",
+                }
+            )
+            from app.core.model_tracker import model_tracker
+            model_tracker.record_flywheel_add()
+        except Exception as kb_err:
+            logger.warning("Could not add ticket resolution to knowledge base: %s", kb_err)
+
+        # Module 4B: Publish real-time event to Redis/SSE publisher for multi-pod scaling
+        try:
+            from app.core.sse_publisher import sse_publisher
+            await sse_publisher.ticket_resolved(
+                ticket_id=str(ticket.id),
+                title=ticket.title,
+                resolved_by=str(agent_user.full_name or agent_user.email),
+            )
+        except Exception as sse_err:
+            logger.warning("Could not publish ticket_resolved via SSE publisher: %s", sse_err)
+
         return ticket
 
     async def delete_ticket(self, ticket_id: str, user: User) -> dict:
@@ -618,6 +650,299 @@ class TicketService:
                 "latest_reopen_reason": reason
             }
         )
+        ticket.routing_details = self.compute_routing_details(ticket)
+        return ticket
+
+    def compute_routing_details(self, ticket: Ticket) -> dict[str, Any]:
+        """
+        Computes detailed operational routing transparency metadata explaining:
+        - Who this ticket was routed to (Admin, Manager, Employee)
+        - Why it was routed (Operational reasons, governance policy, consensus validation, lockout/downtime rules)
+        - Actionable governance controls for the reviewer.
+        """
+        from app.core.activity_registry import get_activity
+        act = get_activity(ticket.activity_code or "UNKNOWN")
+        meta = ticket.meta_info or {}
+        status = (ticket.status or "open").lower()
+
+        routed_to_role = "agent"
+        role_title = "Support Employee / Agent"
+        routing_reason = "Standard operational maintenance task routed to the Application Support queue for execution."
+        routing_policy = "Policy 1.1: Standard Application Support Delivery"
+        governance_level = "Standard"
+        requires_approval = False
+        approval_type = None
+
+        if status == "pending_cancellation":
+            routed_to_role = "manager"
+            role_title = "Support Manager / Administrator"
+            cancel_req = meta.get("cancel_request", {})
+            user_reason = cancel_req.get("reason", "No reason provided")
+            requested_by = cancel_req.get("requested_by", "Requester")
+            routing_reason = f"Cancellation Request: {requested_by} requested ticket cancellation with reason: '{user_reason}'. Requires managerial or administrator review and sign-off."
+            routing_policy = "Policy 4.2: Customer Cancellation Governance"
+            governance_level = "High Priority Cancellation Review"
+            requires_approval = True
+            approval_type = "cancellation_approval"
+
+        elif status == "pending_admin_approval" or ticket.requires_admin_approval:
+            routed_to_role = "admin"
+            role_title = "System Administrator"
+            routing_reason = (
+                f"Restricted High-Impact Operation ({act.activity_name}). "
+                f"Execution Mode: {ticket.execution_mode or act.execution_mode}. "
+                f"Downtime Requirement: {'Planned Downtime Required' if ticket.downtime_required else 'User Lockout Required'}. "
+                "Because this operation locks runtime binaries or freezes active user sessions, enterprise policy mandates explicit Administrator authorization before execution."
+            )
+            routing_policy = "Policy 3.1: Restricted Operation & Change Advisory Governance"
+            governance_level = "Critical Administrator Authorization"
+            requires_approval = True
+            approval_type = "admin_restricted_approval"
+
+        elif status == "pending_manager_routing" or ticket.technical_scope == "out_of_application_scope":
+            routed_to_role = "manager"
+            role_title = "Support Manager"
+            routing_reason = (
+                f"Specialized Technical Scope ({ticket.activity_code or 'Infrastructure'}). "
+                "This request falls outside the boundary of direct Application Support and requires Manager Review to evaluate and dispatch to external specialized teams (e.g. DBA, Server Management, Network)."
+            )
+            routing_policy = "Policy 2.4: Out-of-Scope Infrastructure Dispatch"
+            governance_level = "Managerial Review"
+            requires_approval = True
+            approval_type = "manager_route"
+
+        elif status == "routed":
+            routed_to_role = "manager"
+            role_title = f"Dispatched Team ({ticket.routed_to_team or 'External Engineering'})"
+            routing_reason = f"Ticket successfully transferred to {ticket.routed_to_team or 'external engineering team'} by management for specialized operational handling."
+            routing_policy = "Policy 2.4: Out-of-Scope External Delegation"
+            governance_level = "External Specialized Delegation"
+
+        elif status == "reopened":
+            routed_to_role = "agent"
+            role_title = "Lead Support Employee"
+            reopen_count = meta.get("reopen_count", 1)
+            latest_reason = meta.get("latest_reopen_reason", "")
+            routing_reason = f"Reopened Maintenance Request (Attempt {reopen_count}/3). Priority automatically escalated to HIGH. Customer stated: '{latest_reason}'."
+            routing_policy = "Policy 5.1: SLA Escalation & Resolution Rework"
+            governance_level = "Elevated Priority"
+
+        else:
+            assigned_name = ticket.assignee.full_name if ticket.assignee else "Application Support Queue"
+            routing_reason = (
+                f"Direct Application Support queue for {act.activity_name}. "
+                f"Operates in {ticket.execution_mode or 'Online'} Mode with zero or minimal disruption. "
+                f"Assigned To: {assigned_name}."
+            )
+
+        consensus_info = meta.get("consensus_result")
+        consensus_details = None
+        if consensus_info and not consensus_info.get("skipped"):
+            consensus_details = {
+                "unanimous": consensus_info.get("unanimous", False),
+                "agreement_ratio": consensus_info.get("agreement_ratio", "3/3"),
+                "average_confidence": consensus_info.get("average_confidence", 0.95),
+                "consensus_activity_code": consensus_info.get("consensus_activity_code", ticket.activity_code),
+                "consensus_admin_approval": consensus_info.get("consensus_admin_approval", ticket.requires_admin_approval),
+                "escalate_to_human": consensus_info.get("escalate_to_human", False),
+            }
+
+        return {
+            "routed_to_role": routed_to_role,
+            "role_title": role_title,
+            "routing_reason": routing_reason,
+            "routing_policy": routing_policy,
+            "governance_level": governance_level,
+            "requires_approval": requires_approval,
+            "approval_type": approval_type,
+            "activity_name": act.activity_name,
+            "execution_mode": ticket.execution_mode or act.execution_mode,
+            "downtime_required": ticket.downtime_required,
+            "prerequisites_confirmed": ticket.prerequisites_confirmed,
+            "downtime_acknowledged": ticket.downtime_acknowledged,
+            "consensus_validation": consensus_details,
+            "cancel_request": meta.get("cancel_request") if status == "pending_cancellation" else None,
+        }
+
+    async def request_cancellation(self, ticket_id: str, user: User, reason: str, session: AsyncSession) -> Ticket:
+        ticket = await self._get_ticket_for_update(ticket_id, user, session)
+        user_roles = [r.name.lower() for r in user.roles]
+        
+        # Only creator or staff can request cancellation
+        if "admin" not in user_roles and "manager" not in user_roles and "agent" not in user_roles:
+            if ticket.created_by_id != user.id:
+                raise AuthorizationError("You can only request cancellation for your own tickets.")
+                
+        if ticket.status in ["cancelled", "closed", "resolved"]:
+            raise ValidationError(f"Ticket cannot be cancelled because its status is already '{ticket.status}'.")
+
+        validate_transition(ticket.status, "pending_cancellation", user_roles)
+
+        old_status = ticket.status
+        ticket.status = "pending_cancellation"
+        
+        meta = dict(ticket.meta_info or {})
+        now_str = datetime.now(timezone.utc).isoformat()
+        meta["cancel_request"] = {
+            "requested_by": user.full_name,
+            "requested_by_id": user.id,
+            "reason": reason,
+            "requested_at": now_str,
+            "previous_status": old_status,
+        }
+        ticket.meta_info = meta
+        ticket.version += 1
+
+        await self.ticket_repo.record_history(
+            ticket.id,
+            user.id,
+            "status",
+            old_status,
+            "pending_cancellation",
+            f"User requested cancellation: {reason}"
+        )
+        await self.ticket_repo.add_comment(
+            ticket_id=ticket.id,
+            user_id=user.id,
+            content=f"🚫 **Cancellation Requested**\n\n**Reason:** {reason}\n\n*Awaiting Manager or Administrator review and approval.*",
+            is_internal=False,
+        )
+
+        await session.commit()
+        await notification_service.broadcast(
+            "ticket_updated",
+            {
+                "ticket_id": ticket.id,
+                "ticket_number": ticket.ticket_number,
+                "status": "pending_cancellation",
+                "title": ticket.title,
+                "cancel_reason": reason,
+                "requested_by": user.full_name,
+            }
+        )
+        ticket.routing_details = self.compute_routing_details(ticket)
+        return ticket
+
+    async def approve_cancellation(self, ticket_id: str, user: User, notes: Optional[str], session: AsyncSession) -> Ticket:
+        ticket = await self._get_ticket_for_update(ticket_id, user, session)
+        user_roles = [r.name.lower() for r in user.roles]
+        if "manager" not in user_roles and "admin" not in user_roles:
+            raise AuthorizationError("Only a Manager or Administrator can approve ticket cancellations.")
+
+        if ticket.status != "pending_cancellation":
+            raise ValidationError("Ticket does not have an active cancellation request pending.")
+
+        validate_transition(ticket.status, "cancelled", user_roles)
+
+        old_status = ticket.status
+        ticket.status = "cancelled"
+        ticket.closed_at = datetime.now(timezone.utc)
+        
+        meta = dict(ticket.meta_info or {})
+        now_str = datetime.now(timezone.utc).isoformat()
+        meta["cancel_approval"] = {
+            "approved_by": user.full_name,
+            "approved_by_id": user.id,
+            "approved_at": now_str,
+            "notes": notes or "Cancellation approved",
+        }
+        ticket.meta_info = meta
+        ticket.version += 1
+
+        history_msg = f"Cancellation approved by {user.full_name}"
+        if notes:
+            history_msg += f": {notes}"
+
+        await self.ticket_repo.record_history(
+            ticket.id,
+            user.id,
+            "status",
+            old_status,
+            "cancelled",
+            history_msg
+        )
+        await self.ticket_repo.add_comment(
+            ticket_id=ticket.id,
+            user_id=user.id,
+            content=f"✅ **Cancellation Approved** by {user.full_name}\n\n**Notes:** {notes or 'Request verified and approved. Ticket is now cancelled.'}",
+            is_internal=False,
+        )
+
+        await session.commit()
+        await notification_service.broadcast(
+            "ticket_updated",
+            {
+                "ticket_id": ticket.id,
+                "ticket_number": ticket.ticket_number,
+                "status": "cancelled",
+                "title": ticket.title,
+                "approved_by": user.full_name,
+            }
+        )
+        ticket.routing_details = self.compute_routing_details(ticket)
+        return ticket
+
+    async def reject_cancellation(self, ticket_id: str, user: User, reason: str, session: AsyncSession) -> Ticket:
+        ticket = await self._get_ticket_for_update(ticket_id, user, session)
+        user_roles = [r.name.lower() for r in user.roles]
+        if "manager" not in user_roles and "admin" not in user_roles:
+            raise AuthorizationError("Only a Manager or Administrator can reject ticket cancellations.")
+
+        if ticket.status != "pending_cancellation":
+            raise ValidationError("Ticket does not have an active cancellation request pending.")
+
+        meta = dict(ticket.meta_info or {})
+        cancel_req = meta.get("cancel_request", {})
+        restored_status = cancel_req.get("previous_status", "open")
+        if restored_status not in ["open", "assigned", "in_progress", "pending_manager_routing", "pending_admin_approval", "approved", "routed", "reopened"]:
+            restored_status = "open"
+
+        validate_transition(ticket.status, restored_status, user_roles)
+
+        old_status = ticket.status
+        ticket.status = restored_status
+        
+        now_str = datetime.now(timezone.utc).isoformat()
+        meta["cancel_rejection"] = {
+            "rejected_by": user.full_name,
+            "rejected_by_id": user.id,
+            "rejected_at": now_str,
+            "reason": reason,
+        }
+        if "cancel_request" in meta:
+            meta["last_rejected_cancel_request"] = meta.pop("cancel_request")
+        ticket.meta_info = meta
+        ticket.version += 1
+
+        history_msg = f"Cancellation rejected by {user.full_name}: {reason}. Status restored to {restored_status}."
+
+        await self.ticket_repo.record_history(
+            ticket.id,
+            user.id,
+            "status",
+            old_status,
+            restored_status,
+            history_msg
+        )
+        await self.ticket_repo.add_comment(
+            ticket_id=ticket.id,
+            user_id=user.id,
+            content=f"❌ **Cancellation Rejected** by {user.full_name}\n\n**Reason:** {reason}\n\n*Ticket status has been restored to **{restored_status.upper()}**.*",
+            is_internal=False,
+        )
+
+        await session.commit()
+        await notification_service.broadcast(
+            "ticket_updated",
+            {
+                "ticket_id": ticket.id,
+                "ticket_number": ticket.ticket_number,
+                "status": restored_status,
+                "title": ticket.title,
+                "rejected_by": user.full_name,
+            }
+        )
+        ticket.routing_details = self.compute_routing_details(ticket)
         return ticket
 
 

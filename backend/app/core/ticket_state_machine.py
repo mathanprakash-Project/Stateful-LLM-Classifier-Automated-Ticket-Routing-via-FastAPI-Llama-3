@@ -58,6 +58,21 @@ ALLOWED_TRANSITIONS: Dict[Tuple[str, str], Set[str]] = {
     ("reopened", "resolved"): {UserRole.AGENT.value, UserRole.MANAGER.value, UserRole.ADMIN.value},
     ("reopened", "closed"): {UserRole.USER.value, UserRole.MANAGER.value, UserRole.ADMIN.value},
     ("reopened", "cancelled"): {UserRole.MANAGER.value, UserRole.ADMIN.value},
+    # User Cancellation Request & Approval flow
+    ("open", "pending_cancellation"): {UserRole.USER.value, UserRole.MANAGER.value, UserRole.ADMIN.value},
+    ("assigned", "pending_cancellation"): {UserRole.USER.value, UserRole.MANAGER.value, UserRole.ADMIN.value},
+    ("in_progress", "pending_cancellation"): {UserRole.USER.value, UserRole.MANAGER.value, UserRole.ADMIN.value},
+    ("pending_manager_routing", "pending_cancellation"): {UserRole.USER.value, UserRole.MANAGER.value, UserRole.ADMIN.value},
+    ("pending_admin_approval", "pending_cancellation"): {UserRole.USER.value, UserRole.ADMIN.value},
+    ("approved", "pending_cancellation"): {UserRole.USER.value, UserRole.MANAGER.value, UserRole.ADMIN.value},
+    ("routed", "pending_cancellation"): {UserRole.USER.value, UserRole.MANAGER.value, UserRole.ADMIN.value},
+    ("reopened", "pending_cancellation"): {UserRole.USER.value, UserRole.MANAGER.value, UserRole.ADMIN.value},
+    ("pending_cancellation", "cancelled"): {UserRole.MANAGER.value, UserRole.ADMIN.value},
+    ("pending_cancellation", "open"): {UserRole.MANAGER.value, UserRole.ADMIN.value},
+    ("pending_cancellation", "in_progress"): {UserRole.MANAGER.value, UserRole.ADMIN.value},
+    ("pending_cancellation", "assigned"): {UserRole.MANAGER.value, UserRole.ADMIN.value},
+    ("pending_cancellation", "pending_manager_routing"): {UserRole.MANAGER.value, UserRole.ADMIN.value},
+    ("pending_cancellation", "pending_admin_approval"): {UserRole.ADMIN.value},
 }
 
 

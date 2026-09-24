@@ -2,7 +2,9 @@
    CORONA DARK ADMIN THEME DESIGN SYSTEM
    ========================================================================== */
 
-:root {
+:root,
+body.theme-dark,
+[data-theme="dark"] {
   /* Core Typography */
   --font-body: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-heading: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -68,6 +70,53 @@
   --shadow-glow-purple: 0 0 15px rgba(143, 95, 232, 0.35);
 }
 
+body.theme-light,
+[data-theme="light"] {
+  /* Corona Light Brand Color Palette */
+  --corona-bg: #f8fafc;
+  --corona-surface: #ffffff;
+  --corona-surface-card: #ffffff;
+  --corona-surface-hover: #f1f5f9;
+  --corona-surface-elevated: #f1f5f9;
+  --corona-border: #e2e8f0;
+  --corona-border-subtle: rgba(0, 0, 0, 0.06);
+
+  /* Accents tuned for crisp contrast on light backgrounds */
+  --corona-green: #059669;
+  --corona-green-rgb: 5, 150, 105;
+  --corona-green-bg: rgba(5, 150, 105, 0.12);
+
+  --corona-purple: #7c3aed;
+  --corona-purple-rgb: 124, 58, 237;
+  --corona-purple-bg: rgba(124, 58, 237, 0.12);
+
+  --corona-blue: #0284c7;
+  --corona-blue-rgb: 2, 132, 199;
+  --corona-blue-bg: rgba(2, 132, 199, 0.12);
+
+  --corona-pink: #db2777;
+  --corona-pink-rgb: 219, 39, 119;
+  --corona-pink-bg: rgba(219, 39, 119, 0.12);
+
+  --corona-orange: #d97706;
+  --corona-orange-rgb: 217, 119, 6;
+  --corona-orange-bg: rgba(217, 119, 6, 0.12);
+
+  --corona-red: #dc2626;
+  --corona-red-rgb: 220, 38, 38;
+  --corona-red-bg: rgba(220, 38, 38, 0.12);
+
+  /* Light Typography Colors */
+  --text-main: #0f172a;
+  --text-muted: #64748b;
+  --text-dim: #94a3b8;
+  --text-light: #334155;
+
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px -1px rgba(0, 0, 0, 0.08);
+  --shadow-glow-green: 0 4px 12px rgba(5, 150, 105, 0.2);
+  --shadow-glow-purple: 0 4px 12px rgba(124, 58, 237, 0.2);
+}
+
 /* Base Reset & Styling */
 * {
   box-sizing: border-box;
@@ -107,7 +156,7 @@ body {
 }
 
 /* Form Controls & Dropdown Theming */
-select, .form-select, .form-input, .form-textarea {
+select:not(.model-dropdown-select), .form-select, .form-input, .form-textarea {
   background-color: var(--corona-surface-elevated) !important;
   color: var(--text-main) !important;
   border: 1px solid var(--corona-border) !important;
@@ -119,7 +168,7 @@ select, .form-select, .form-input, .form-textarea {
   transition: var(--transition) !important;
 }
 
-select:focus, .form-select:focus, .form-input:focus, .form-textarea:focus {
+select:not(.model-dropdown-select):focus, .form-select:focus, .form-input:focus, .form-textarea:focus {
   border-color: var(--corona-purple) !important;
   box-shadow: 0 0 0 2px rgba(143, 95, 232, 0.25) !important;
 }
@@ -365,4 +414,287 @@ select option, .form-select option {
   color: #94a3b8;
   font-style: italic;
 }
+
+/* ==========================================================================
+   LIGHT THEME GLOBAL COMPONENT STYLING & HIGH CONTRAST REFINEMENTS
+   ========================================================================== */
+
+body.theme-light {
+  background-color: var(--corona-bg);
+  color: var(--text-main);
+}
+
+/* Light Theme Surface Containers */
+body.theme-light .corona-app-shell,
+body.theme-light .corona-content,
+body.theme-light .corona-body {
+  background-color: var(--corona-bg) !important;
+}
+
+body.theme-light .corona-header,
+body.theme-light .corona-sidebar,
+body.theme-light .corona-card,
+body.theme-light .card,
+body.theme-light .card-subtle,
+body.theme-light .detail-card,
+body.theme-light .activity-detail-card,
+body.theme-light .routing-intelligence-card,
+body.theme-light .admin-action-panel,
+body.theme-light .timeline-section,
+body.theme-light .process-tracker-card,
+body.theme-light .kpi-card,
+body.theme-light .tier-card,
+body.theme-light .chat-container,
+body.theme-light .modal-box-corona,
+body.theme-light .role-modal-card {
+  background-color: var(--corona-surface) !important;
+  border-color: var(--corona-border) !important;
+  color: var(--text-main) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Elevated Containers & Sub-cards */
+body.theme-light .sidebar-user-card,
+body.theme-light .corona-user-dropdown,
+body.theme-light .role-current-box,
+body.theme-light .role-card,
+body.theme-light .rf-pill,
+body.theme-light .operational-banner,
+body.theme-light .workflow-stepper {
+  background-color: var(--corona-surface-elevated) !important;
+  border-color: var(--corona-border) !important;
+  color: var(--text-main) !important;
+}
+
+/* Typography & Headings in Light Mode */
+body.theme-light .view-title,
+body.theme-light .view-heading,
+body.theme-light .card-title,
+body.theme-light .modal-title,
+body.theme-light .metric-value,
+body.theme-light .kpi-value,
+body.theme-light .corona-logo-text,
+body.theme-light .sidebar-name,
+body.theme-light .dropdown-user-name,
+body.theme-light .rc-name,
+body.theme-light .role-user-name,
+body.theme-light .agent-name,
+body.theme-light .activity-name,
+body.theme-light .font-semibold,
+body.theme-light .checkbox-label,
+body.theme-light .timeline-field-title,
+body.theme-light .retention-text strong {
+  color: var(--text-main) !important;
+}
+
+/* Inputs, Textareas, Selects in Light Mode */
+body.theme-light .search-input,
+body.theme-light .form-input,
+body.theme-light .form-textarea,
+body.theme-light .form-select,
+body.theme-light .filter-select,
+body.theme-light .chat-text-input,
+body.theme-light .chat-downtime-input,
+body.theme-light .draft-text-field,
+body.theme-light .draft-select-field,
+body.theme-light .draft-textarea-field,
+body.theme-light select:not(.model-dropdown-select),
+body.theme-light input[type="text"],
+body.theme-light textarea {
+  background-color: var(--corona-surface) !important;
+  color: var(--text-main) !important;
+  border-color: var(--corona-border) !important;
+}
+
+body.theme-light .search-input:focus,
+body.theme-light .form-input:focus,
+body.theme-light .form-textarea:focus,
+body.theme-light .form-select:focus,
+body.theme-light .chat-text-input:focus {
+  border-color: var(--corona-purple) !important;
+  box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.15) !important;
+}
+
+/* Buttons in Light Mode */
+body.theme-light .btn-outlined {
+  border-color: var(--corona-border) !important;
+  color: var(--text-main) !important;
+}
+body.theme-light .btn-outlined:hover {
+  background-color: var(--corona-surface-hover) !important;
+  border-color: var(--corona-purple) !important;
+}
+
+body.theme-light .btn-cancel {
+  border-color: var(--corona-border) !important;
+  color: var(--text-muted) !important;
+}
+body.theme-light .btn-cancel:hover {
+  background-color: var(--corona-surface-hover) !important;
+  color: var(--text-main) !important;
+}
+
+/* Active Nav Items & Interactive Elements */
+body.theme-light .corona-nav-item.active {
+  background-color: rgba(124, 58, 237, 0.08) !important;
+  color: var(--corona-purple) !important;
+}
+body.theme-light .corona-nav-item:hover {
+  background-color: var(--corona-surface-hover) !important;
+  color: var(--text-main) !important;
+}
+
+body.theme-light .stage-tab-btn {
+  background-color: var(--corona-surface) !important;
+  border-color: var(--corona-border) !important;
+  color: var(--text-muted) !important;
+}
+body.theme-light .stage-tab-btn.active {
+  background-color: rgba(124, 58, 237, 0.1) !important;
+  border-color: var(--corona-purple) !important;
+  color: var(--corona-purple) !important;
+}
+
+/* Chat & AI Messages in Light Mode */
+body.theme-light .chat-header {
+  background-color: var(--corona-surface) !important;
+}
+body.theme-light .chat-input-bar {
+  background-color: var(--corona-surface) !important;
+}
+body.theme-light .chat-stream {
+  background-color: var(--corona-bg) !important;
+}
+body.theme-light .ai-bubble {
+  background-color: #ffffff !important;
+  border-color: var(--corona-border) !important;
+  color: var(--text-main) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
+}
+body.theme-light .user-bubble {
+  background-color: #ede9fe !important;
+  border-color: #ddd6fe !important;
+  color: #1e1b4b !important;
+}
+body.theme-light .user-av {
+  background-color: #ffffff !important;
+  border-color: var(--corona-border) !important;
+}
+body.theme-light .draft-desc-box {
+  background-color: #f8fafc !important;
+  border-color: var(--corona-border) !important;
+  color: var(--text-main) !important;
+}
+body.theme-light .draft-op-box {
+  background-color: #f8fafc !important;
+  border-color: var(--corona-border) !important;
+}
+body.theme-light .comment-bubble {
+  background-color: var(--corona-surface-elevated) !important;
+  border-color: var(--corona-border) !important;
+  color: var(--text-main) !important;
+}
+
+/* Markdown Rendering in Light Mode */
+body.theme-light .markdown-body {
+  color: #1e293b !important;
+}
+body.theme-light .markdown-body strong {
+  color: #0f172a !important;
+}
+body.theme-light .markdown-body h1,
+body.theme-light .markdown-body h2,
+body.theme-light .markdown-body h3,
+body.theme-light .markdown-body h4 {
+  color: #0f172a !important;
+}
+body.theme-light .markdown-body code {
+  background-color: #f1f5f9 !important;
+  color: #7c3aed !important;
+  border-color: #cbd5e1 !important;
+}
+body.theme-light .markdown-body pre {
+  background-color: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+}
+body.theme-light .markdown-body pre code {
+  color: #0369a1 !important;
+}
+body.theme-light .markdown-body table {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+}
+body.theme-light .markdown-body th {
+  background-color: #f8fafc !important;
+  color: #7c3aed !important;
+  border-bottom-color: #e2e8f0 !important;
+}
+body.theme-light .markdown-body td {
+  color: #334155 !important;
+  border-bottom-color: #f1f5f9 !important;
+}
+body.theme-light .markdown-body blockquote {
+  background-color: rgba(124, 58, 237, 0.05) !important;
+  border-left-color: #7c3aed !important;
+  color: #334155 !important;
+}
+body.theme-light .markdown-body li {
+  color: #334155 !important;
+}
+
+/* Light Mode Tables */
+body.theme-light .table-corona th {
+  background-color: #f8fafc !important;
+  color: var(--text-muted) !important;
+  border-bottom-color: var(--corona-border) !important;
+}
+body.theme-light .table-corona td {
+  border-bottom-color: #f1f5f9 !important;
+  color: var(--text-main) !important;
+}
+body.theme-light .table-corona tr:hover td {
+  background-color: #f8fafc !important;
+}
+
+/* Custom Scrollbar for Light Theme */
+body.theme-light ::-webkit-scrollbar-track {
+  background-color: #f1f5f9;
+}
+body.theme-light ::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1;
+}
+body.theme-light ::-webkit-scrollbar-thumb:hover {
+  background-color: #94a3b8;
+}
+
+/* Common Layout Utilities */
+.flex { display: flex; }
+.inline-flex { display: inline-flex; }
+.flex-col { flex-direction: column; }
+.flex-row { flex-direction: row; }
+.flex-wrap { flex-wrap: wrap; }
+.items-center { align-items: center; }
+.items-start { align-items: flex-start; }
+.items-end { align-items: flex-end; }
+.justify-between { justify-content: space-between; }
+.justify-center { justify-content: center; }
+.justify-end { justify-content: flex-end; }
+.gap-1 { gap: 4px; }
+.gap-2 { gap: 8px; }
+.gap-3 { gap: 12px; }
+.gap-4 { gap: 16px; }
+
+/* Model Selector Pill Light Theme Overrides */
+body.theme-light .model-selector-pill {
+  background-color: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
+}
+body.theme-light .model-dropdown-select {
+  color: #0f172a !important;
+}
+body.theme-light .model-dropdown-select option {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
 

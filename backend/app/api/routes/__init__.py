@@ -5,6 +5,7 @@ from app.api.routes.dashboard import router as dashboard_router
 from app.api.routes.categories import router as category_router
 from app.api.routes.users import router as user_router
 from app.api.routes.events import router as event_router
+from app.api.routes.metrics import router as metrics_router
 
 __all__ = [
     "auth_router",
@@ -14,5 +15,6 @@ __all__ = [
     "category_router",
     "user_router",
     "event_router",
+    "metrics_router",
 ]
 
